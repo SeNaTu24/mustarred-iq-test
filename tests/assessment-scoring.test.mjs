@@ -84,7 +84,11 @@ async function loadBank(fileName) {
 const current = await loadBank("demo-question-bank-v3.ts");
 const previousV2 = await loadBank("demo-question-bank.ts");
 const legacy = await loadBank("demo-question-bank-v1.ts");
-const { createAssessmentItemResult } = await loadBank("item-result.ts");
+const {
+  createAssessmentItemResult,
+  serializeAssessmentResponse,
+  restoreAssessmentResponse,
+} = await loadBank("item-result.ts");
 
 function correctResponses(questions) {
   return new Map(
@@ -271,6 +275,132 @@ test("legacy v1 attempts retain their original 50-question scoring and public ke
   assert.equal(scoreDemoResponse(priorGame, priorGame.key), true);
 });
 
+test("NS-09 and NS-10 persist numeric keys as strings and retain numeric scoring", () => {
+  for (const [questionId, expectedKey, incorrectResponse] of [
+    ["NS-09", "2", 3],
+    ["NS-10", "3", 2],
+  ]) {
+    const question = current.demoQuestions.find((item) => item.id === questionId);
+    assert.ok(question, `${questionId} exists in the current bank`);
+    assert.equal(typeof question.key, "number");
+    assert.equal(question.key, Number(expectedKey));
+    assert.equal(current.scoreDemoResponse(question, question.key), true);
+    assert.equal(current.scoreDemoResponse(question, incorrectResponse), false);
+
+    const payload = createAssessmentItemResult({
+      attemptId: "attempt-rotation",
+      question,
+      response: question.key,
+      isCorrect: true,
+      scoringExplanation: question.rationale,
+      questionSetVersion: current.DEMO_QUESTION_SET_VERSION,
+      scoringRuleVersion: current.DEMO_SCORING_RULE_VERSION,
+      includeScoringType: false,
+    });
+    assert.equal(payload.candidate_response, expectedKey);
+    assert.equal(typeof payload.candidate_response, "string");
+    assert.equal(payload.key_response, expectedKey);
+  }
+});
+
+test("rotation answer 2 persists as a string, reloads as numeric 2, and scores correctly", async () => {
+  const question = current.demoQuestions.find((item) => item.id === "NS-09");
+  assert.ok(question);
+
+  const persistedResponse = serializeAssessmentResponse(question, 2);
+  assert.equal(persistedResponse, "2");
+  assert.equal(typeof persistedResponse, "string");
+
+  const restoredResponse = restoreAssessmentResponse(question, persistedResponse);
+  assert.equal(restoredResponse, 2);
+  assert.equal(typeof restoredResponse, "number");
+  assert.equal(current.scoreDemoResponse(question, restoredResponse), true);
+
+  const payload = createAssessmentItemResult({
+    attemptId: "attempt-rotation-roundtrip",
+    question,
+    response: restoredResponse,
+    isCorrect: current.scoreDemoResponse(question, restoredResponse),
+    scoringExplanation: question.rationale,
+    questionSetVersion: current.DEMO_QUESTION_SET_VERSION,
+    scoringRuleVersion: current.DEMO_SCORING_RULE_VERSION,
+    includeScoringType: false,
+  });
+  assert.equal(payload.candidate_response, "2");
+  assert.equal(typeof payload.candidate_response, "string");
+
+  const answerRoute = await readFile(
+    resolve(projectRoot, "app", "api", "assessment", "answer", "route.ts"),
+    "utf8",
+  );
+  assert.match(
+    answerRoute,
+    /requested_response:\s*serializeAssessmentResponse\(question,\s*body\.response\)/s,
+  );
+  const serverSource = await readFile(
+    resolve(projectRoot, "lib", "assessment", "server.ts"),
+    "utf8",
+  );
+  assert.match(serverSource, /restoreAssessmentResponse\(question,\s*row\.response\)/s);
+  const sessionRoute = await readFile(
+    resolve(projectRoot, "app", "api", "assessment", "session", "route.ts"),
+    "utf8",
+  );
+  assert.match(sessionRoute, /restoreAssessmentResponse\(question,\s*row\.response\)/s);
+});
+
+test("string, array, object, and behavioral responses remain unchanged", () => {
+  const stringQuestion = current.demoQuestions.find((item) => item.id === "PR-01");
+  const sudokuQuestion = current.demoQuestions.find((item) => item.id === "NS-05");
+  const placementQuestion = current.demoQuestions.find((item) => item.id === "NS-07");
+  const behavioralQuestion = previousV2.demoQuestions.find(
+    (item) => item.scoringType === "behavioral",
+  );
+  assert.ok(stringQuestion && sudokuQuestion && placementQuestion && behavioralQuestion);
+
+  const cases = [
+    [stringQuestion, "b"],
+    [sudokuQuestion, [...sudokuQuestion.key]],
+    [placementQuestion, { x: 2, y: 1, rotation: 0 }],
+    [behavioralQuestion, "a"],
+  ];
+  for (const [question, response] of cases) {
+    const persistedResponse = serializeAssessmentResponse(question, response);
+    assert.deepEqual(persistedResponse, response);
+    assert.deepEqual(restoreAssessmentResponse(question, persistedResponse), response);
+  }
+
+  const behavioralPayload = createAssessmentItemResult({
+    attemptId: "attempt-behavioral-response",
+    question: behavioralQuestion,
+    response: "a",
+    isCorrect: false,
+    scoringExplanation: "Unscored behavioral response.",
+    questionSetVersion: previousV2.DEMO_QUESTION_SET_VERSION,
+    scoringRuleVersion: previousV2.DEMO_SCORING_RULE_VERSION,
+  });
+  assert.equal(behavioralPayload.candidate_response, "a");
+  assert.equal(behavioralPayload.key_response, null);
+});
+
+test("objective string, array, object, and null keys keep their original values", () => {
+  const baseQuestion = current.demoQuestions.find((item) => item.id === "PR-01");
+  assert.ok(baseQuestion);
+
+  for (const key of ["b", ["one", "two"], { x: 1, y: 2 }, null]) {
+    const payload = createAssessmentItemResult({
+      attemptId: "attempt-key-shapes",
+      question: { ...baseQuestion, key },
+      response: "b",
+      isCorrect: false,
+      scoringExplanation: "Test snapshot.",
+      questionSetVersion: current.DEMO_QUESTION_SET_VERSION,
+      scoringRuleVersion: current.DEMO_SCORING_RULE_VERSION,
+    });
+    assert.deepEqual(payload.key_response, key);
+  }
+});
+
 test("persisted objective item payload retains its key, correctness, and points", () => {
   const question = current.demoQuestions.find((item) => item.id === "PR-01");
   assert.ok(question);
@@ -307,7 +437,7 @@ test("persisted objective item payload retains its key, correctness, and points"
   });
 });
 
-test("persisted behavioral item payload explicitly has behavioral type and null score fields", () => {
+test("regression: behavioral item keys stay null with null score fields", () => {
   const question = previousV2.demoQuestions.find((item) => item.scoringType === "behavioral");
   assert.ok(question);
   const payload = createAssessmentItemResult({

@@ -14,3 +14,11 @@ export async function finalizeAndGetResult<T>(
   }
   return { status, result: await getResult() };
 }
+
+export async function expireAndGetResult<T>(
+  finalizeAsExpired: () => Promise<void>,
+  getResult: () => Promise<T>,
+): Promise<{ status: "expired"; result: T }> {
+  await finalizeAsExpired();
+  return { status: "expired", result: await getResult() };
+}

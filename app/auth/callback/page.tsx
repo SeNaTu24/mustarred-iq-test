@@ -4,209 +4,67 @@ import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import {
+  PENDING_CONFIRMATION_EMAIL_KEY,
+  processEmailConfirmation,
+  type EmailConfirmationOutcome,
+} from "@/lib/supabase/email-confirmation";
 
-type CallbackOutcome =
-  | { success: true; recovery?: boolean }
-  | { success: false; stage: string; detail: string; needsName?: boolean };
-
+type CallbackOutcome = EmailConfirmationOutcome;
 let callbackProcessing: Promise<CallbackOutcome> | null = null;
-const CALLBACK_TIMEOUT_MS = 20_000;
-
-function getSafeErrorCode(error: unknown) {
-  if (typeof error !== "object" || error === null || !("code" in error)) {
-    return "";
-  }
-  const code = error.code;
-  return typeof code === "string" && /^[A-Za-z0-9_.-]{1,80}$/.test(code)
-    ? code
-    : "";
-}
 
 async function processCandidateEmailCallback(): Promise<CallbackOutcome> {
-  let stage = "reading the verification response";
-  let detail = "";
-  let callbackPath = "";
+  const supabase = getSupabaseBrowserClient();
+  let expectedEmail: string | null = null;
   try {
-    const callbackUrl = new URL(window.location.href);
-    callbackPath = callbackUrl.pathname;
-    const fragment = new URLSearchParams(callbackUrl.hash.slice(1));
-    const callbackError =
-      callbackUrl.searchParams.get("error") ?? fragment.get("error");
-    if (callbackError) {
-      const errorCode =
-        callbackUrl.searchParams.get("error_code") ??
-        fragment.get("error_code") ??
-        "";
-      detail = /^[A-Za-z0-9_.-]{1,80}$/.test(errorCode) ? errorCode : "";
-      throw new Error("The email verification link is invalid or has expired.");
-    }
-
-    const code = callbackUrl.searchParams.get("code") ?? fragment.get("code");
-    const tokenHash =
-      callbackUrl.searchParams.get("token_hash") ?? fragment.get("token_hash");
-    const accessToken =
-      callbackUrl.searchParams.get("access_token") ??
-      fragment.get("access_token");
-    const refreshToken =
-      callbackUrl.searchParams.get("refresh_token") ??
-      fragment.get("refresh_token");
-    const verificationType =
-      callbackUrl.searchParams.get("type") ?? fragment.get("type");
-    const isRecovery =
-      verificationType === "recovery" ||
-      callbackUrl.searchParams.get("flow") === "recovery";
-    if (
-      Number(Boolean(code)) +
-        Number(Boolean(tokenHash)) +
-        Number(Boolean(accessToken || refreshToken)) >
-      1
-    ) {
-      throw new Error("The email verification link is invalid.");
-    }
-
-    const supabase = getSupabaseBrowserClient();
-    if (code) {
-      stage = "exchanging the verification code";
-      const { error } = await supabase.auth.exchangeCodeForSession(code);
-      if (error) {
-        detail = getSafeErrorCode(error);
-        throw new Error("The email verification link is invalid or has expired.");
-      }
-    } else if (tokenHash) {
-      if (
-        verificationType !== "signup" &&
-        verificationType !== "email" &&
-        verificationType !== "recovery"
-      ) {
-        throw new Error("The email verification link is invalid.");
-      }
-      stage = "verifying the confirmation token";
-      const { error } = await supabase.auth.verifyOtp({
-        token_hash: tokenHash,
-        type: verificationType,
-      });
-      if (error) {
-        detail = getSafeErrorCode(error);
-        throw new Error("The email verification link is invalid or has expired.");
-      }
-    } else if (accessToken || refreshToken) {
-      if (!accessToken || !refreshToken) {
-        throw new Error("The email verification link is invalid.");
-      }
-      stage = "restoring the verification session";
-      const { error } = await supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken,
-      });
-      if (error) {
-        detail = getSafeErrorCode(error);
-        throw new Error("The email verification link is invalid or has expired.");
-      }
-    }
-
-    stage = "restoring the Supabase session";
-    const {
-      data: { session },
-      error: sessionError,
-    } = await supabase.auth.getSession();
-    if (sessionError) {
-      detail = getSafeErrorCode(sessionError);
-      throw sessionError;
-    }
-    if (!session) {
-      throw new Error(
-        "No verified session was returned. The link may have expired or already been used.",
-      );
-    }
-
-    stage = "confirming the verified email";
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-    if (userError || !user?.email_confirmed_at) {
-      detail = getSafeErrorCode(userError);
-      throw new Error(
-        "Email verification could not be confirmed. Try the verification link again.",
-      );
-    }
-
-    if (window.location.pathname === callbackUrl.pathname) {
-      window.history.replaceState({}, document.title, callbackUrl.pathname);
-    }
-
-    if (isRecovery) {
-      return { success: true, recovery: true };
-    }
-
-    stage = "creating the candidate profile";
-    const response = await fetch("/api/candidate/profile", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-        "Content-Type": "application/json",
-      },
-    });
-    const result = (await response.json()) as {
-      error?: string;
-      code?: string;
-    };
-    if (
-      response.status === 422 &&
-      result.code === "candidate_name_required"
-    ) {
-      return {
-        success: false,
-        stage: "creating the candidate profile",
-        detail: "candidate_name_required",
-        needsName: true,
-      };
-    }
-    if (!response.ok) {
-      const errorCode =
-        typeof result.code === "string" &&
-        /^[A-Za-z0-9_.-]{1,80}$/.test(result.code)
-          ? result.code
-          : "";
-      detail = `HTTP ${response.status}${errorCode ? ` (${errorCode})` : ""}`;
-      throw new Error(result.error ?? "Candidate profile creation failed.");
-    }
-
-    return { success: true };
-  } catch (error) {
-    if (!detail && typeof error === "object" && error !== null && "name" in error) {
-      const name = error.name;
-      detail =
-        typeof name === "string" && /^[A-Za-z0-9_.-]{1,80}$/.test(name)
-          ? name
-          : "";
-    }
-    if (callbackPath && window.location.pathname === callbackPath) {
-      window.history.replaceState({}, document.title, callbackPath);
-    }
-    return { success: false, stage, detail };
+    expectedEmail = window.localStorage.getItem(PENDING_CONFIRMATION_EMAIL_KEY);
+  } catch {
+    // A successful first-use callback still works when browser storage is unavailable.
   }
-}
 
-function withCallbackTimeout(
-  operation: Promise<CallbackOutcome>,
-): Promise<CallbackOutcome> {
-  let timeoutId: number | undefined;
-  const timeout = new Promise<CallbackOutcome>((resolve) => {
-    timeoutId = window.setTimeout(
-      () =>
-        resolve({
-          success: false,
-          stage: "waiting for the verification response",
-          detail: "timed_out",
-        }),
-      CALLBACK_TIMEOUT_MS,
-    );
+  const outcome = await processEmailConfirmation({
+    callbackUrl: window.location.href,
+    expectedEmail,
+    auth: {
+      exchangeCodeForSession: (code) =>
+        supabase.auth.exchangeCodeForSession(code),
+      verifyOtp: (params) => supabase.auth.verifyOtp(params),
+      setSession: (tokens) => supabase.auth.setSession(tokens),
+      getSession: () => supabase.auth.getSession(),
+      getUser: () => supabase.auth.getUser(),
+    },
+    ensureCandidateProfile: async (accessToken) => {
+      const response = await fetch("/api/candidate/profile", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      });
+      let code: string | undefined;
+      try {
+        const result = (await response.json()) as { code?: unknown };
+        code = typeof result.code === "string" ? result.code : undefined;
+      } catch {
+        // The retry below safely rechecks the profile through the idempotent endpoint.
+      }
+      return { ok: response.ok, status: response.status, code };
+    },
   });
 
-  return Promise.race([operation, timeout]).finally(() => {
-    if (timeoutId !== undefined) window.clearTimeout(timeoutId);
-  });
+  const currentUrl = new URL(window.location.href);
+  if (currentUrl.search || currentUrl.hash) {
+    window.history.replaceState({}, document.title, currentUrl.pathname);
+  }
+
+  if (outcome.kind === "success" && !outcome.recovery) {
+    try {
+      window.localStorage.removeItem(PENDING_CONFIRMATION_EMAIL_KEY);
+    } catch {
+      // Profile setup has succeeded; local storage cleanup is best-effort only.
+    }
+  }
+  return outcome;
 }
 
 export default function AuthCallbackPage() {
@@ -245,19 +103,34 @@ export default function AuthCallbackPage() {
         throw new Error("Email verification could not be confirmed.");
       }
 
-      const response = await fetch("/api/candidate/profile", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ fullName: name }),
-      });
-      const result = (await response.json()) as {
-        error?: string;
-        code?: string;
-      };
-      if (!response.ok) {
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        let response: Response;
+        try {
+          response = await fetch("/api/candidate/profile", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ fullName: name }),
+          });
+        } catch (error) {
+          if (attempt === 0) continue;
+          throw error;
+        }
+
+        let result: { error?: string; code?: string } = {};
+        try {
+          result = (await response.json()) as { error?: string; code?: string };
+        } catch {
+          // An empty/malformed response may follow a successful insert; retry idempotently.
+        }
+        if (response.ok) {
+          router.replace("/start/instructions?registration=complete");
+          return;
+        }
+        if (response.status >= 500 && attempt === 0) continue;
+
         const errorCode =
           typeof result.code === "string" &&
           /^[A-Za-z0-9_.-]{1,80}$/.test(result.code)
@@ -272,7 +145,7 @@ export default function AuthCallbackPage() {
         throw new Error(result.error ?? "Candidate profile creation failed.");
       }
 
-      router.replace("/start/instructions?registration=complete");
+      throw new Error("Candidate profile setup could not be confirmed.");
     } catch (error) {
       if (process.env.NODE_ENV === "development") {
         console.warn(
@@ -293,13 +166,11 @@ export default function AuthCallbackPage() {
     let cancelled = false;
     const operation =
       callbackProcessing ??
-      (callbackProcessing = withCallbackTimeout(
-        processCandidateEmailCallback(),
-      ));
+      (callbackProcessing = processCandidateEmailCallback());
 
     void operation.then((outcome) => {
       if (cancelled) return;
-      if (outcome.success) {
+      if (outcome.kind === "success") {
         router.replace(
           outcome.recovery
             ? "/auth/update-password"
@@ -308,7 +179,7 @@ export default function AuthCallbackPage() {
         return;
       }
 
-      if (outcome.needsName) {
+      if (outcome.kind === "needs_name") {
         setNeedsName(true);
         setMessage("Your email is verified. Enter your name to finish setting up your account.");
         if (process.env.NODE_ENV === "development") {
@@ -317,25 +188,34 @@ export default function AuthCallbackPage() {
         return;
       }
 
-      if (outcome.detail === "timed_out") {
-        window.history.replaceState(
-          {},
-          document.title,
-          window.location.pathname,
-        );
-      }
       setHasError(true);
       if (process.env.NODE_ENV === "development") {
-        console.warn("Candidate verification failed:", {
-          stage: outcome.stage,
-          ...(outcome.detail ? { detail: outcome.detail } : {}),
+        console.warn("Candidate verification callback did not complete:", {
+          outcome: outcome.kind,
+          ...(outcome.code ? { code: outcome.code } : {}),
+          ...("status" in outcome && outcome.status
+            ? { status: outcome.status }
+            : {}),
         });
       }
-      setMessage(
-        outcome.detail === "timed_out"
-          ? "Verification is taking longer than expected. Check your connection and try again. If you opened the email on another device, open the latest link in the browser where you registered."
-          : "We couldn’t verify your email or finish setting up your account. The link may have expired or already been used. Try the latest link or sign in.",
-      );
+
+      if (outcome.kind === "invalid_link") {
+        setMessage(
+          "This confirmation link is invalid or expired. Request a new link, then open it in the browser where you registered.",
+        );
+      } else if (outcome.kind === "session_unavailable") {
+        setMessage(
+          "The confirmation link could not be used in this browser. Return to candidate sign-in and finish setup there, or request a new link in the browser where you registered.",
+        );
+      } else if (outcome.kind === "not_verified") {
+        setMessage(
+          "Your email is not confirmed yet. Request a new confirmation link before signing in.",
+        );
+      } else {
+        setMessage(
+          "Your email is verified, but we couldn’t confirm that account setup finished. Sign in to retry setup; your account history is unchanged.",
+        );
+      }
     }).finally(() => {
       if (callbackProcessing === operation) callbackProcessing = null;
     });

@@ -6,6 +6,7 @@ import {
   isDemoAttempt,
 } from "@/lib/assessment/server";
 import { getAssessmentQuestionSet } from "@/lib/assessment/question-sets";
+import { restoreAssessmentResponse } from "@/lib/assessment/item-result";
 
 export async function GET(request: Request) {
   const auth = await authenticateCandidate(request);
@@ -53,7 +54,15 @@ export async function GET(request: Request) {
       throw new Error(`Answer retrieval failed: ${answersError.message}`);
     }
     const answers = Object.fromEntries(
-      (answerRows ?? []).map((row) => [row.question_id, row.response]),
+      (answerRows ?? []).map((row) => {
+        const question = questionSet.getQuestion(row.question_id);
+        return [
+          row.question_id,
+          question
+            ? restoreAssessmentResponse(question, row.response)
+            : row.response,
+        ];
+      }),
     );
 
     const result =

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
+  createDebouncedDraftAutosaver,
   saveAllPendingDrafts,
   saveIfDraftIsCurrent,
 } from "@/lib/assessment/draft-persistence";
@@ -133,6 +134,7 @@ export function AssessmentClient() {
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [drafts, setDrafts] = useState<Record<string, unknown>>({});
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [saveErrors, setSaveErrors] = useState<Record<string, string>>({});
   const [currentIndex, setCurrentIndex] = useState(0);
   const [serverOffsetMs, setServerOffsetMs] = useState(0);
   const [now, setNow] = useState(0);
@@ -143,6 +145,11 @@ export function AssessmentClient() {
   const draftValuesRef = useRef(new Map<string, unknown>());
   const draftVersionsRef = useRef(new Map<string, number>());
   const savedVersionsRef = useRef(new Map<string, number>());
+  const autosaverRef = useRef<{
+    schedule: (questionId: string, response: unknown, version: number) => void;
+    flush: (questionId: string) => Promise<void>;
+    flushAll: () => Promise<void>;
+  } | null>(null);
   const inFlightSavesRef = useRef(new Set<Promise<void>>());
   const [message, setMessage] = useState("");
   const [result, setResult] = useState<AssessmentResult | null>(null);
@@ -173,6 +180,7 @@ export function AssessmentClient() {
     setSession(payload);
     setAnswers(payload.answers ?? {});
     setSavedIds(new Set(Object.keys(payload.answers ?? {})));
+    setSaveErrors({});
     draftValuesRef.current.clear();
     draftVersionsRef.current.clear();
     savedVersionsRef.current.clear();
@@ -366,22 +374,19 @@ export function AssessmentClient() {
     const questionId = currentQuestion.id;
     const responseValue = activeResponse;
     const version = draftVersionsRef.current.get(questionId) ?? 0;
-    const saveOperation = saveAnswerResponse(questionId, responseValue, version);
+    const autosaver = autosaverRef.current;
+    let saveOperation: Promise<void>;
+    if (autosaver) {
+      autosaver.schedule(questionId, responseValue, version);
+      saveOperation = autosaver.flush(questionId);
+    } else {
+      saveOperation = saveAnswerResponse(questionId, responseValue, version);
+    }
     inFlightSavesRef.current.add(saveOperation);
     try {
       await saveOperation;
-    } catch (error) {
-      const questionNumber =
-        session?.questions.findIndex(({ id }) => id === questionId) ?? -1;
-      const detail =
-        error instanceof Error
-          ? error.message
-          : "Please check your connection and retry.";
-      setMessage(
-        questionNumber >= 0 && !detail.startsWith(`Question ${questionNumber + 1}`)
-          ? `Question ${questionNumber + 1} could not be saved. Your answer remains on this page. ${detail}`
-          : detail,
-      );
+    } catch {
+      // saveAnswerResponse records the failure beside the affected question.
     } finally {
       inFlightSavesRef.current.delete(saveOperation);
       setIsSaving(false);
@@ -393,40 +398,105 @@ export function AssessmentClient() {
     responseValue: unknown,
     version: number,
   ) {
-    await saveIfDraftIsCurrent(
-      questionId,
-      responseValue,
-      version,
-      (id) => draftVersionsRef.current.get(id) ?? 0,
-      async (id, value) => {
-        const response = await fetchWithTimeout("/api/assessment/answer", {
-          method: "PUT",
-          headers: await bearerHeaders(),
-          body: JSON.stringify({ questionId: id, response: value }),
-        });
-        const payload = (await response.json()) as {
-          error?: string;
-          result?: AssessmentResult;
-        };
-        if (!response.ok) {
-          if (response.status === 410 && payload.result) {
-            setAttemptStatus("expired");
-            setResult(payload.result);
-            setMessage("Time is up. Your saved answers have been scored.");
-            throw new Error("Time is up. Your saved answers have been scored.");
+    try {
+      await saveIfDraftIsCurrent(
+        questionId,
+        responseValue,
+        version,
+        (id) => draftVersionsRef.current.get(id) ?? 0,
+        async (id, value) => {
+          const response = await fetchWithTimeout("/api/assessment/answer", {
+            method: "PUT",
+            headers: await bearerHeaders(),
+            body: JSON.stringify({ questionId: id, response: value }),
+          });
+          const payload = (await response.json()) as {
+            error?: string;
+            result?: AssessmentResult;
+          };
+          if (!response.ok) {
+            if (response.status === 410 && payload.result) {
+              setAttemptStatus("expired");
+              setResult(payload.result);
+              setMessage("Time is up. Your saved answers have been scored.");
+              throw new Error("Time is up. Your saved answers have been scored.");
+            }
+            throw new Error(
+              responseError(payload, "Your answer could not be saved."),
+            );
           }
-          throw new Error(
-            responseError(payload, "Your answer could not be saved."),
-          );
-        }
-        setAnswers((previous) => ({ ...previous, [id]: value }));
-      },
-      (id, savedVersion) => {
-        savedVersionsRef.current.set(id, savedVersion);
-        setSavedIds((previous) => new Set(previous).add(id));
-      },
-    );
+          setAnswers((previous) => ({ ...previous, [id]: value }));
+        },
+        (id, savedVersion) => {
+          savedVersionsRef.current.set(id, savedVersion);
+          setSavedIds((previous) => new Set(previous).add(id));
+          setSaveErrors((previous) => {
+            if (!(id in previous)) return previous;
+            const next = { ...previous };
+            delete next[id];
+            return next;
+          });
+        },
+      );
+    } catch (error) {
+      if ((draftVersionsRef.current.get(questionId) ?? 0) === version) {
+        setSavedIds((previous) => {
+          const next = new Set(previous);
+          next.delete(questionId);
+          return next;
+        });
+        setSaveErrors((previous) => ({
+          ...previous,
+          [questionId]: error instanceof Error
+            ? error.message
+            : "Please check your connection and retry.",
+        }));
+      }
+      throw error;
+    }
   }
+  const saveAnswerResponseRef = useRef(saveAnswerResponse);
+  saveAnswerResponseRef.current = saveAnswerResponse;
+
+  useEffect(() => {
+    const autosaver = createDebouncedDraftAutosaver<unknown>({
+      delayMs: 600,
+      getCurrentVersion: (questionId) =>
+        draftVersionsRef.current.get(questionId) ?? 0,
+      save: (questionId, response, version) =>
+        saveAnswerResponseRef.current(questionId, response, version),
+    });
+
+    autosaverRef.current = autosaver;
+
+    return () => {
+      autosaverRef.current = null;
+      void autosaver.flushAll().catch((error: unknown) => {
+        console.error(
+          "Assessment autosave cleanup flush failed:",
+          error instanceof Error ? error.message : "Unknown error",
+        );
+      });
+    };
+  }, []);
+
+  useEffect(() => {
+    function warnBeforeLosingUnsavedAnswers(event: BeforeUnloadEvent) {
+      const hasUnsavedAnswers = [...draftVersionsRef.current].some(
+        ([questionId, version]) =>
+          savedVersionsRef.current.get(questionId) !== version,
+      );
+      if (!hasUnsavedAnswers) return;
+
+      event.preventDefault();
+      event.returnValue = "";
+    }
+
+    window.addEventListener("beforeunload", warnBeforeLosingUnsavedAnswers);
+    return () => {
+      window.removeEventListener("beforeunload", warnBeforeLosingUnsavedAnswers);
+    };
+  }, []);
 
   async function submitAssessment() {
     if (
@@ -462,6 +532,7 @@ export function AssessmentClient() {
       ) {
         setMessage("Saving your unsaved answers before submission…");
       }
+      await autosaverRef.current?.flushAll();
       await saveAllPendingDrafts({
         getDrafts: () => draftValuesRef.current,
         getVersion: (questionId) =>
@@ -538,16 +609,29 @@ export function AssessmentClient() {
 
   function setDraft(value: unknown) {
     if (!currentQuestion || isSubmittingRef.current) return;
-    const version = (draftVersionsRef.current.get(currentQuestion.id) ?? 0) + 1;
-    draftValuesRef.current.set(currentQuestion.id, value);
-    draftVersionsRef.current.set(currentQuestion.id, version);
-    setDrafts((previous) => ({ ...previous, [currentQuestion.id]: value }));
+
+    const questionId = currentQuestion.id;
+    const version = (draftVersionsRef.current.get(questionId) ?? 0) + 1;
+
+    draftValuesRef.current.set(questionId, value);
+    draftVersionsRef.current.set(questionId, version);
+
+    setDrafts((previous) => ({ ...previous, [questionId]: value }));
     setSavedIds((previous) => {
       const next = new Set(previous);
-      next.delete(currentQuestion.id);
+      next.delete(questionId);
       return next;
     });
+    setSaveErrors((previous) => {
+      if (!(questionId in previous)) return previous;
+      const next = { ...previous };
+      delete next[questionId];
+      return next;
+    });
+
+    autosaverRef.current?.schedule(questionId, value, version);
   }
+
 
   if (isLoading) {
     return <main className="demo-assessment"><p role="status">Loading your assessment…</p></main>;
@@ -662,6 +746,31 @@ export function AssessmentClient() {
         max={session.questions.length}
         value={answeredCount}
       />
+      {Object.entries(saveErrors).length > 0 && (
+        <aside className="demo-error" role="alert" aria-live="assertive">
+          <p>Some answers could not be saved. Review them and retry before submitting:</p>
+          <ul>
+            {Object.entries(saveErrors).map(([questionId, error]) => {
+              const failedQuestionIndex = session.questions.findIndex(
+                (question) => question.id === questionId,
+              );
+              return (
+                <li key={questionId}>
+                  Question {failedQuestionIndex + 1}: {error}{" "}
+                  {failedQuestionIndex >= 0 && (
+                    <button
+                      onClick={() => setCurrentIndex(failedQuestionIndex)}
+                      type="button"
+                    >
+                      Review and retry
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </aside>
+      )}
       <nav className="demo-question-nav" aria-label="Question navigation">
         {session.questions.map((question, index) => (
           <button
@@ -744,17 +853,21 @@ export function AssessmentClient() {
           />
         )}
         <p className="demo-answer-state" aria-live="polite">
-          {savedIds.has(currentQuestion.id) ? "Answer saved" : "Answer not saved"}
+          {!saveErrors[currentQuestion.id] && savedIds.has(currentQuestion.id)
+            ? "Answer saved"
+            : "Answer not saved"}
         </p>
         <div className="demo-actions">
-          <button
-            className="button button-primary"
-            disabled={isSubmitting || isSaving || secondsRemaining === 0}
-            onClick={() => void saveAnswer()}
-            type="button"
-          >
-            {isSaving ? "Saving…" : "Save answer"}
-          </button>
+          {saveErrors[currentQuestion.id] && (
+            <button
+              className="button button-primary"
+              disabled={isSubmitting || isSaving || secondsRemaining === 0}
+              onClick={() => void saveAnswer()}
+              type="button"
+            >
+              {isSaving ? "Saving…" : "Retry save"}
+            </button>
+          )}
           <div className="demo-prev-next">
             <button
               className="button"
