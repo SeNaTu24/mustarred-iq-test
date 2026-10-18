@@ -32,12 +32,28 @@ test("candidate only sees results after confirmed terminal submission and reques
   assert.match(source, /Submission confirmed\./);
 });
 
-async function loadBank(fileName) {
+const bankModuleUrls = new Map();
+
+async function loadBankModuleUrl(fileName) {
+  if (bankModuleUrls.has(fileName)) return bankModuleUrls.get(fileName);
   const bankPath = resolve(projectRoot, "lib", "assessment", fileName);
-  const source = await readFile(bankPath, "utf8");
-  const testableSource = source.replace(/^import "server-only";\r?\n/, "");
+  let source = await readFile(bankPath, "utf8");
+  let testableSource = source.replace(/^import "server-only";\r?\n/, "");
   if (fileName.includes("demo-question-bank")) {
     assert.notEqual(testableSource, source, `Expected server-only marker in ${fileName}.`);
+  }
+  if (fileName === "demo-question-bank-v3.ts") {
+    const v2ModuleUrl = await loadBankModuleUrl("demo-question-bank.ts");
+    testableSource = testableSource.replace(
+      /import \{[\s\S]*?\} from "\.\/demo-question-bank";/,
+      `const v2Bank = await import("${v2ModuleUrl}");
+const V2_SCORING_RULE_VERSION = v2Bank.DEMO_SCORING_RULE_VERSION;
+const v2Questions = v2Bank.demoQuestions;
+const validateV2Response = v2Bank.getDemoResponseValidationError;
+const toV2PublicQuestion = v2Bank.getPublicDemoQuestion;
+const scoreV2Response = v2Bank.scoreDemoResponse;
+type DemoQuestion = (typeof v2Bank.demoQuestions)[number];`,
+    );
   }
   const { outputText, diagnostics = [] } = ts.transpileModule(testableSource, {
     compilerOptions: {
@@ -56,10 +72,17 @@ async function loadBank(fileName) {
     [],
     `${fileName} should transpile for in-memory tests.`,
   );
-  return import(`data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`);
+  const moduleUrl = `data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`;
+  bankModuleUrls.set(fileName, moduleUrl);
+  return moduleUrl;
 }
 
-const current = await loadBank("demo-question-bank.ts");
+async function loadBank(fileName) {
+  return import(await loadBankModuleUrl(fileName));
+}
+
+const current = await loadBank("demo-question-bank-v3.ts");
+const previousV2 = await loadBank("demo-question-bank.ts");
 const legacy = await loadBank("demo-question-bank-v1.ts");
 const { createAssessmentItemResult } = await loadBank("item-result.ts");
 
@@ -83,32 +106,37 @@ function firstUiResponse(question) {
   return question.options?.[0]?.id;
 }
 
-test("v2 bank has 50 objective questions and five separate work-style prompts", () => {
+test("current bank contains exactly 50 objective questions and no behavioural prompts", () => {
   const { demoQuestions, validateDemoBank } = current;
   validateDemoBank();
-  assert.equal(demoQuestions.length, 55);
-  assert.equal(new Set(demoQuestions.map((question) => question.id)).size, 55);
+  assert.equal(demoQuestions.length, 50);
+  assert.equal(new Set(demoQuestions.map((question) => question.id)).size, 50);
   assert.equal(demoQuestions.filter((question) => question.scoringType === "objective").length, 50);
-  assert.equal(demoQuestions.filter((question) => question.scoringType === "behavioral").length, 5);
+  assert.equal(demoQuestions.filter((question) => question.scoringType === "behavioral").length, 0);
   for (const round of [1, 2, 3, 4, 5]) {
     assert.equal(
-      demoQuestions.filter((question) => question.round === round && question.scoringType === "objective").length,
+      demoQuestions.filter((question) => question.round === round).length,
       10,
     );
   }
 });
 
-test("public question data contains visual/game instructions but never scoring keys or rationales", () => {
+test("the previous 55-item v2 bank remains available for existing attempts", () => {
+  previousV2.validateDemoBank();
+  assert.equal(previousV2.demoQuestions.length, 55);
+  assert.equal(previousV2.demoQuestions.filter((question) => question.scoringType === "objective").length, 50);
+  assert.equal(previousV2.demoQuestions.filter((question) => question.scoringType === "behavioral").length, 5);
+  assert.equal(previousV2.DEMO_QUESTION_SET_VERSION, "mustarred-assessment-2026-10-v2");
+  assert.equal(current.DEMO_QUESTION_SET_VERSION, "mustarred-assessment-2026-10-v3");
+});
+
+test("public current question data contains no scoring keys, rationales, or behavioural prompts", () => {
   for (const question of current.demoQuestions) {
     const publicQuestion = current.getPublicDemoQuestion(question);
     assert.equal("key" in publicQuestion, false, `${question.id} key is private`);
     assert.equal("rationale" in publicQuestion, false, `${question.id} rationale is private`);
     assert.equal("scoringType" in publicQuestion, false, `${question.id} internal scoring type is private`);
-    assert.equal(
-      "responseType" in publicQuestion,
-      true,
-      `${question.id} only exposes whether a prompt is a work-style response`,
-    );
+    assert.equal(publicQuestion.responseType, "objective");
   }
   assert.equal(current.demoQuestions.filter((question) => question.visual).length, 10);
   assert.ok(current.demoQuestions.filter((question) => question.visual).every(
@@ -116,7 +144,7 @@ test("public question data contains visual/game instructions but never scoring k
   ));
 });
 
-test("candidate UI answer shapes for all 55 questions pass server validation", () => {
+test("candidate UI answer shapes for all 50 current questions pass server validation", () => {
   for (const question of current.demoQuestions) {
     const response = firstUiResponse(question);
     assert.notEqual(response, undefined, `${question.id} should have a candidate UI response`);
@@ -156,23 +184,42 @@ test("game questions implement Sudoku, block placement, and rotation interaction
   assert.equal(current.isValidDemoResponse(rotation, 4), false);
 });
 
-test("all objective answer keys score 50/50 and five unscored responses do not affect score", () => {
+test("all current answer keys score exactly 50/50 across five sections", () => {
   const { demoQuestions, scoreAllDemoResponses } = current;
   const responses = correctResponses(demoQuestions);
-  for (const question of demoQuestions.filter((item) => item.scoringType === "behavioral")) {
-    responses.set(question.id, question.options[0].id);
-  }
   const result = scoreAllDemoResponses(responses);
   assert.equal(result.totalCorrect, 50);
   assert.equal(result.percentage, 100);
   assert.equal(result.outcome, "PASS");
   assert.deepEqual(result.rounds.map(({ correct }) => correct), [10, 10, 10, 10, 10]);
 
-  const workStyle = demoQuestions.find((question) => question.scoringType === "behavioral");
-  assert.ok(workStyle);
-  assert.equal(current.scoreDemoResponse(workStyle, "not-an-option"), false);
-  responses.delete(workStyle.id);
-  assert.equal(scoreAllDemoResponses(responses).totalCorrect, 50);
+});
+
+test("harder pattern questions have four distinct distractors and one keyed answer", () => {
+  const patterns = current.demoQuestions.filter((question) => question.format === "pattern");
+  assert.equal(patterns.length, 10);
+  for (const question of patterns) {
+    assert.ok(question.visual, `${question.id} has a visual pattern`);
+    assert.equal(question.visual.choices.length, 4);
+    assert.equal(new Set(question.visual.choices.map(({ id }) => id)).size, 4);
+    assert.equal(
+      new Set(question.visual.choices.map(({ tile }) => JSON.stringify(tile))).size,
+      4,
+      `${question.id} choices are visually distinct`,
+    );
+    const correctChoices = question.visual.choices.filter(
+      ({ id }) => current.scoreDemoResponse(question, id),
+    );
+    assert.deepEqual(correctChoices.map(({ id }) => id), [question.key]);
+    assert.equal(
+      current.getDemoResponseValidationError(question, question.key),
+      null,
+      `${question.id} key passes response validation`,
+    );
+  }
+  assert.ok(patterns.some((question) => /increasing amount/i.test(question.text)));
+  assert.ok(patterns.some((question) => question.visual.layout === "matrix"));
+  assert.ok(patterns.some((question) => /alternat|cycle|two rules/i.test(question.text)));
 });
 
 test("the 40/50 pass mark and unanswered scoring remain unchanged", () => {
@@ -235,6 +282,7 @@ test("persisted objective item payload retains its key, correctness, and points"
     scoringExplanation: question.rationale,
     questionSetVersion: current.DEMO_QUESTION_SET_VERSION,
     scoringRuleVersion: current.DEMO_SCORING_RULE_VERSION,
+    includeScoringType: false,
   });
   assert.deepEqual(payload, {
     attempt_id: "attempt-1",
@@ -250,7 +298,6 @@ test("persisted objective item payload retains its key, correctness, and points"
       scoringType: "objective",
     },
     candidate_response: "b",
-    scoring_type: "objective",
     key_response: "b",
     is_correct: true,
     points: 1,
@@ -261,7 +308,7 @@ test("persisted objective item payload retains its key, correctness, and points"
 });
 
 test("persisted behavioral item payload explicitly has behavioral type and null score fields", () => {
-  const question = current.demoQuestions.find((item) => item.scoringType === "behavioral");
+  const question = previousV2.demoQuestions.find((item) => item.scoringType === "behavioral");
   assert.ok(question);
   const payload = createAssessmentItemResult({
     attemptId: "attempt-2",
@@ -269,8 +316,8 @@ test("persisted behavioral item payload explicitly has behavioral type and null 
     response: "a",
     isCorrect: false,
     scoringExplanation: "Unscored work-style response. Recorded for descriptive review only.",
-    questionSetVersion: current.DEMO_QUESTION_SET_VERSION,
-    scoringRuleVersion: current.DEMO_SCORING_RULE_VERSION,
+    questionSetVersion: previousV2.DEMO_QUESTION_SET_VERSION,
+    scoringRuleVersion: previousV2.DEMO_SCORING_RULE_VERSION,
   });
   assert.deepEqual(payload, {
     attempt_id: "attempt-2",
@@ -291,8 +338,8 @@ test("persisted behavioral item payload explicitly has behavioral type and null 
     is_correct: null,
     points: null,
     scoring_explanation: "Unscored work-style response. Recorded for descriptive review only.",
-    question_set_version: current.DEMO_QUESTION_SET_VERSION,
-    scoring_rule_version: current.DEMO_SCORING_RULE_VERSION,
+    question_set_version: previousV2.DEMO_QUESTION_SET_VERSION,
+    scoring_rule_version: previousV2.DEMO_SCORING_RULE_VERSION,
   });
   assert.notEqual(payload.scoring_type, "objective");
 });
@@ -329,16 +376,28 @@ test("migration retains the v1 count and supports v2 behavioral snapshots withou
     "utf8",
   );
   assert.match(serverSource, /createAssessmentItemResult\(\{/);
+  const v3Migration = await readFile(
+    resolve(projectRoot, "supabase", "migrations", "20261018104900_assessment_v3_fifty_question_support.sql"),
+    "utf8",
+  );
+  assert.match(v3Migration, /mustarred-assessment-2026-10-v3[\s\S]*?expected_count := 50/);
+  assert.match(v3Migration, /mustarred-assessment-2026-10-v2' then\s+expected_count := 55/s);
 });
 
-test("new attempts use the validated v2 bank and recruiter summary selects only pre-v2 result columns", async () => {
+test("new attempts use the validated v3 bank and retain recruiter result compatibility", async () => {
   const beginRoute = await readFile(
     resolve(projectRoot, "app", "api", "assessment", "begin", "route.ts"),
     "utf8",
   );
-  assert.match(beginRoute, /from "@\/lib\/assessment\/demo-question-bank"/);
+  assert.match(beginRoute, /from "@\/lib\/assessment\/demo-question-bank-v3"/);
   assert.match(beginRoute, /validateDemoBank\(\)/);
   assert.match(beginRoute, /requested_question_set_version: DEMO_QUESTION_SET_VERSION/);
+
+  const sessionRoute = await readFile(
+    resolve(projectRoot, "app", "api", "assessment", "session", "route.ts"),
+    "utf8",
+  );
+  assert.match(sessionRoute, /question\.scoringType === "objective"/);
 
   const recruiterRoute = await readFile(
     resolve(projectRoot, "app", "api", "recruiter", "results", "route.ts"),

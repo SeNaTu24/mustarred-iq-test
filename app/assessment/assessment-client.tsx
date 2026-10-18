@@ -159,7 +159,7 @@ export function AssessmentClient() {
       router.replace("/start");
       throw new Error("Sign in and verify your email to continue.");
     }
-    const response = await fetch("/api/assessment/session", {
+    const response = await fetchWithTimeout("/api/assessment/session", {
       headers: { Authorization: `Bearer ${authSession.access_token}` },
       cache: "no-store",
     });
@@ -177,6 +177,7 @@ export function AssessmentClient() {
     setResult(payload.result);
     setServerOffsetMs(Date.parse(payload.serverNow) - Date.now());
     setNow(Date.now());
+    return payload;
   }, [router]);
 
   useEffect(() => {
@@ -225,7 +226,9 @@ export function AssessmentClient() {
   const formattedTime = `${Math.floor(secondsRemaining / 60)
     .toString()
     .padStart(2, "0")}:${(secondsRemaining % 60).toString().padStart(2, "0")}`;
-  const answeredCount = Object.keys(answers).length;
+  const answeredCount = session
+    ? session.questions.filter((question) => answers[question.id] !== undefined).length
+    : 0;
 
   useEffect(() => {
     if (
@@ -350,6 +353,7 @@ export function AssessmentClient() {
     setMessage("");
     setIsSubmitting(true);
     let savingQuestionNumber: number | null = null;
+    let submissionRequestStarted = false;
     try {
       if (inFlightSavesRef.current.size > 0) {
         setMessage("Saving your unsaved answers before submission…");
@@ -380,6 +384,7 @@ export function AssessmentClient() {
         },
       });
 
+      submissionRequestStarted = true;
       const response = await fetchWithTimeout("/api/assessment/submit", {
         method: "POST",
         headers: await bearerHeaders(),
@@ -409,9 +414,28 @@ export function AssessmentClient() {
             ? detail
             : `Question ${savingQuestionNumber} could not be saved. Your answer remains on this page. ${detail}`,
         );
+      } else if (submissionRequestStarted) {
+        let recovered = false;
+        try {
+          const recoveredSession = await loadSession();
+          recovered =
+            recoveredSession.result !== null &&
+            (recoveredSession.attempt.status === "submitted" ||
+              recoveredSession.attempt.status === "expired");
+        } catch (recoveryError) {
+          console.error(
+            "Submission status recovery failed:",
+            recoveryError instanceof Error ? recoveryError.name : "Unknown error",
+          );
+        }
+        if (!recovered) {
+          setMessage(
+            "Submission is not confirmed. No result is shown until the server confirms it. Please retry.",
+          );
+        }
       } else {
         setMessage(
-          `We couldn’t confirm your submission. Your saved answers are safe; try again. ${detail}`,
+          `Submission could not be started. Your answer changes remain on this page; retry when ready. ${detail}`,
         );
       }
     } finally {

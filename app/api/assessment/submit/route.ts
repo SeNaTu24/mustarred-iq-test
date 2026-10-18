@@ -5,6 +5,7 @@ import {
   isDemoAttempt,
 } from "@/lib/assessment/server";
 import { getAssessmentQuestionSet } from "@/lib/assessment/question-sets";
+import { finalizeAndGetResult } from "@/lib/assessment/submission";
 
 export async function POST(request: Request) {
   const auth = await authenticateCandidate(request);
@@ -24,20 +25,22 @@ export async function POST(request: Request) {
     }
     questionSet.validate();
 
-    const { data: terminalStatus, error: finalizeError } = await supabase.rpc(
-      "finalize_or_get_assessment_attempt",
-      { requested_attempt_id: attempt.id },
+    const { status: terminalStatus, result } = await finalizeAndGetResult(
+      attempt.status,
+      async () => {
+        const { data, error } = await supabase.rpc(
+          "finalize_or_get_assessment_attempt",
+          { requested_attempt_id: attempt.id },
+        );
+        if (error || (data !== "submitted" && data !== "expired")) {
+          throw new Error(
+            `Attempt finalization failed: ${error?.message ?? "unexpected status"}`,
+          );
+        }
+        return data;
+      },
+      () => calculateAndSaveResult(supabase, attempt.id),
     );
-    if (
-      finalizeError ||
-      (terminalStatus !== "submitted" && terminalStatus !== "expired")
-    ) {
-      throw new Error(
-        `Attempt finalization failed: ${finalizeError?.message ?? "unexpected status"}`,
-      );
-    }
-
-    const result = await calculateAndSaveResult(supabase, attempt.id);
     return Response.json({
       status: terminalStatus,
       result,
@@ -48,7 +51,7 @@ export async function POST(request: Request) {
       error instanceof Error ? error.message : "Unknown error",
     );
     return Response.json(
-      { error: "We couldn’t submit your assessment. Your saved answers are safe; please try again." },
+      { error: "We couldn’t confirm the submission. Please retry; no result is shown until the server confirms it." },
       { status: 500 },
     );
   }

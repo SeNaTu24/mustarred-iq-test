@@ -9,6 +9,16 @@ import {
   scoreAllDemoResponses,
   scoreDemoResponse,
   validateDemoBank,
+} from "./demo-question-bank-v3";
+import {
+  DEMO_QUESTION_SET_VERSION as V2_VERSION,
+  DEMO_SCORING_RULE_VERSION as V2_SCORING_RULE_VERSION,
+  demoQuestions as v2Questions,
+  getDemoResponseValidationError as getV2ValidationError,
+  getPublicDemoQuestion as getV2PublicQuestion,
+  scoreAllDemoResponses as scoreV2Responses,
+  scoreDemoResponse as scoreV2Response,
+  validateDemoBank as validateV2Bank,
 } from "./demo-question-bank";
 import {
   DEMO_QUESTION_SET_VERSION as LEGACY_VERSION,
@@ -55,6 +65,7 @@ export type AssessmentQuestionSet = {
 };
 
 const currentQuestionById = new Map(demoQuestions.map((question) => [question.id, question]));
+const v2QuestionById = new Map(v2Questions.map((question) => [question.id, question]));
 const legacyQuestionById = new Map(legacyQuestions.map((question) => [question.id, question]));
 
 const currentSet: AssessmentQuestionSet = {
@@ -76,6 +87,28 @@ const currentSet: AssessmentQuestionSet = {
   validate: validateDemoBank,
   explanation: (questionId) =>
     currentQuestionById.get(questionId)?.rationale ??
+    "One point is awarded for the keyed objective response.",
+};
+
+const v2Set: AssessmentQuestionSet = {
+  version: V2_VERSION,
+  label: "Previous 55-item assessment version",
+  scoringRuleVersion: V2_SCORING_RULE_VERSION,
+  questions: v2Questions,
+  publicQuestions: v2Questions.map(getV2PublicQuestion),
+  getQuestion: (questionId) => v2QuestionById.get(questionId),
+  validateResponse: (questionId, response) => {
+    const question = v2QuestionById.get(questionId);
+    return question ? getV2ValidationError(question, response) : null;
+  },
+  scoreResponse: (questionId, response) => {
+    const question = v2QuestionById.get(questionId);
+    return question ? scoreV2Response(question, response) : false;
+  },
+  scoreResponses: (responses) => scoreV2Responses(responses),
+  validate: validateV2Bank,
+  explanation: (questionId) =>
+    v2QuestionById.get(questionId)?.rationale ??
     "One point is awarded for the keyed objective response.",
 };
 
@@ -119,6 +152,7 @@ const legacySet: AssessmentQuestionSet = {
 
 export function getAssessmentQuestionSet(version: string): AssessmentQuestionSet | null {
   if (version === CURRENT_VERSION) return currentSet;
+  if (version === V2_VERSION) return v2Set;
   if (version === LEGACY_VERSION) return legacySet;
   return null;
 }

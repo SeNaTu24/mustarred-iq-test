@@ -70,7 +70,11 @@ export async function GET(request: Request) {
         startedAt: attempt.started_at,
         deadlineAt: attempt.deadline_at,
       },
-      questions: questionSet.publicQuestions,
+      questions: questionSet.questions.flatMap((question, index) =>
+        question.scoringType === "objective"
+          ? [questionSet.publicQuestions[index]]
+          : [],
+      ),
       answers,
       result,
     });

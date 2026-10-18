@@ -4,7 +4,7 @@ import type { User } from "@supabase/supabase-js";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createAssessmentItemResult } from "./item-result";
 import { getAssessmentQuestionSet } from "./question-sets";
-import { DEMO_QUESTION_SET_VERSION as LEGACY_QUESTION_SET_VERSION } from "./demo-question-bank-v1";
+import { DEMO_QUESTION_SET_VERSION as V2_QUESTION_SET_VERSION } from "./demo-question-bank";
 
 type PersistedAssessmentResult = {
   total_correct: number;
@@ -160,10 +160,7 @@ export async function calculateAndSaveResult(
   if (!questionSet) {
     throw new Error(`Unsupported assessment question set: ${attempt.question_set_version}`);
   }
-  const usesLegacySchema =
-    questionSet.version === LEGACY_QUESTION_SET_VERSION;
-  const resultColumns =
-    "total_correct, percentage, outcome, round_1_correct, round_2_correct, round_3_correct, round_4_correct, round_5_correct, answered_count, unanswered_count, question_set_version, scoring_rule_version, calculated_at";
+  const usesV2Schema = questionSet.version === V2_QUESTION_SET_VERSION;
 
   const { error: unansweredError } = await supabase.rpc(
     "record_unanswered_demo_items",
@@ -178,7 +175,7 @@ export async function calculateAndSaveResult(
 
   const { data: existingResult, error: existingResultError } = await supabase
     .from("assessment_results")
-    .select(resultColumns)
+    .select("*")
     .eq("attempt_id", attemptId)
     .maybeSingle();
   if (existingResultError) {
@@ -221,7 +218,7 @@ export async function calculateAndSaveResult(
         : questionSet.explanation(question.id),
       questionSetVersion: questionSet.version,
       scoringRuleVersion: questionSet.scoringRuleVersion,
-      includeScoringType: !usesLegacySchema,
+      includeScoringType: usesV2Schema,
     });
   });
   const hasResponse = (questionId: string) => {
@@ -270,7 +267,7 @@ export async function calculateAndSaveResult(
     round_5_correct: scored.rounds[4].correct,
     percentage: scored.percentage,
     outcome: scored.outcome,
-    ...(!usesLegacySchema
+    ...(usesV2Schema
       ? {
           behavioral_answered_count: behavioralAnsweredCount,
           behavioral_unanswered_count:
@@ -287,7 +284,7 @@ export async function calculateAndSaveResult(
 
   const { data, error } = await supabase
     .from("assessment_results")
-    .select(resultColumns)
+    .select("*")
     .eq("attempt_id", attemptId)
     .single();
   if (error || !data) {

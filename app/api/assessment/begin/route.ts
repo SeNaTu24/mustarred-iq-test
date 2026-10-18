@@ -2,7 +2,7 @@ import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   DEMO_QUESTION_SET_VERSION,
   validateDemoBank,
-} from "@/lib/assessment/demo-question-bank";
+} from "@/lib/assessment/demo-question-bank-v3";
 
 function getBearerToken(request: Request): string | null {
   const authorization = request.headers.get("authorization");
