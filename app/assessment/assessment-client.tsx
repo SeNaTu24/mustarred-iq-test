@@ -7,6 +7,7 @@ import {
   saveAllPendingDrafts,
   saveIfDraftIsCurrent,
 } from "@/lib/assessment/draft-persistence";
+import type { AssessmentSecurityEventType } from "@/lib/assessment/security-events";
 
 type RoundNumber = 1 | 2 | 3 | 4 | 5;
 type PublicQuestion = {
@@ -148,6 +149,8 @@ export function AssessmentClient() {
   const [attemptStatus, setAttemptStatus] = useState<
     "in_progress" | "submitted" | "expired" | null
   >(null);
+  const [securityWarning, setSecurityWarning] = useState(false);
+  const [securityEventLoggingFailed, setSecurityEventLoggingFailed] = useState(false);
 
   const loadSession = useCallback(async () => {
     const {
@@ -180,6 +183,31 @@ export function AssessmentClient() {
     return payload;
   }, [router]);
 
+  const reportSecurityEvent = useCallback(
+    async (eventType: AssessmentSecurityEventType) => {
+      const {
+        data: { session: authSession },
+        error,
+      } = await getSupabaseBrowserClient().auth.getSession();
+      if (error) throw error;
+      if (!authSession) throw new Error("Your session expired. Sign in again.");
+
+      const response = await fetch("/api/assessment/security-event", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${authSession.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ eventType }),
+        keepalive: true,
+      });
+      if (!response.ok) {
+        throw new Error(`Security activity could not be recorded (${response.status}).`);
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     let cancelled = false;
     const timeoutId = window.setTimeout(() => {
@@ -207,6 +235,70 @@ export function AssessmentClient() {
     const timerId = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(timerId);
   }, []);
+
+  useEffect(() => {
+    const activeAttemptId = session?.attempt.id;
+    if (!activeAttemptId || attemptStatus !== "in_progress") return;
+    let away = false;
+    let active = true;
+
+    function record(eventType: AssessmentSecurityEventType) {
+      setSecurityWarning(true);
+      void reportSecurityEvent(eventType)
+        .catch((error: unknown) => {
+          console.error(
+            "Assessment security event reporting failed:",
+            error instanceof Error ? error.message : "Unknown error",
+          );
+          if (active) {
+            setSecurityWarning(true);
+            setSecurityEventLoggingFailed(true);
+          }
+        });
+    }
+
+    function markAway(eventType: "tab_hidden" | "window_blur") {
+      if (away) return;
+      away = true;
+      record(eventType);
+    }
+
+    function markReturn(eventType: "tab_visible" | "window_focus") {
+      if (!away) return;
+      away = false;
+      record(eventType);
+    }
+
+    function onVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        markAway("tab_hidden");
+      } else {
+        markReturn("tab_visible");
+      }
+    }
+
+    function onWindowBlur() {
+      if (document.visibilityState === "visible") {
+        markAway("window_blur");
+      }
+    }
+
+    function onWindowFocus() {
+      if (document.visibilityState === "visible") {
+        markReturn("window_focus");
+      }
+    }
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("blur", onWindowBlur);
+    window.addEventListener("focus", onWindowFocus);
+    return () => {
+      active = false;
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("blur", onWindowBlur);
+      window.removeEventListener("focus", onWindowFocus);
+    };
+  }, [attemptStatus, reportSecurityEvent, session?.attempt.id]);
 
   const currentQuestion = session?.questions[currentIndex];
   const activeResponse = currentQuestion
@@ -547,6 +639,24 @@ export function AssessmentClient() {
       <p className="demo-progress" aria-live="polite">
         Question {currentIndex + 1} of {session.questions.length} · {answeredCount} saved
       </p>
+      {securityWarning && (
+        <aside className="demo-security-notice" role="status" aria-live="polite">
+          <p>
+            We noticed the assessment window lost visibility or focus. Please keep
+            this window active while you work. This does not affect your score or
+            submission.
+          </p>
+          {securityEventLoggingFailed && (
+            <p>
+              This activity could not be recorded right now. Your assessment remains
+              active; please keep this tab open.
+            </p>
+          )}
+          <button onClick={() => setSecurityWarning(false)} type="button">
+            Dismiss notice
+          </button>
+        </aside>
+      )}
       <progress
         aria-label="Assessment progress"
         max={session.questions.length}
