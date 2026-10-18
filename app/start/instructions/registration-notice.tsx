@@ -28,8 +28,8 @@ export function RegistrationNotice() {
   return (
     <div className="assessment-status-note">
       <p>
-        The instructions and practice are untimed. Sign in on the{" "}
-        <Link href="/start">candidate page</Link> before you begin.
+        Your email is confirmed and your candidate account is ready. Sign in on
+        the <Link href="/start">candidate page</Link> before you begin.
       </p>
     </div>
   );

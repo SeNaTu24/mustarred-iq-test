@@ -2,7 +2,10 @@ import "server-only";
 
 import type { User } from "@supabase/supabase-js";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
-import { createAssessmentItemResult } from "./item-result";
+import {
+  createAssessmentItemResult,
+  restoreAssessmentResponse,
+} from "./item-result";
 import { getAssessmentQuestionSet } from "./question-sets";
 import { DEMO_QUESTION_SET_VERSION as V2_QUESTION_SET_VERSION } from "./demo-question-bank";
 
@@ -195,7 +198,13 @@ export async function calculateAndSaveResult(
 
   const responses = new Map<string, unknown>();
   for (const row of answerRows ?? []) {
-    responses.set(row.question_id, row.response);
+    const question = questionSet.getQuestion(row.question_id);
+    responses.set(
+      row.question_id,
+      question
+        ? restoreAssessmentResponse(question, row.response)
+        : row.response,
+    );
   }
   const scored = questionSet.scoreResponses(responses);
   const itemResults = questionSet.questions.map((question) => {

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getAuthRedirectUrl } from "@/lib/supabase/auth-urls";
+import { PENDING_CONFIRMATION_EMAIL_KEY } from "@/lib/supabase/email-confirmation";
 
 const GENERIC_REGISTRATION_ERROR =
   "We couldn’t create your account. Check your details and try again. If the problem continues, contact support.";
@@ -180,18 +181,30 @@ export function CandidateWelcomeForm() {
         return;
       }
 
+      const normalizedEmail = email.trim();
+      const redirectTo = getAuthRedirectUrl("/auth/callback");
       const { error } = await getSupabaseBrowserClient().auth.signUp({
-        email: email.trim(),
+        email: normalizedEmail,
         password,
         options: {
           data: {
             full_name: typeof fullName === "string" ? fullName.trim() : "",
           },
-          emailRedirectTo: getAuthRedirectUrl("/auth/callback"),
+          emailRedirectTo: redirectTo,
         },
       });
 
       if (error) {
+        try {
+          if (
+            window.localStorage.getItem(PENDING_CONFIRMATION_EMAIL_KEY) ===
+            normalizedEmail
+          ) {
+            window.localStorage.removeItem(PENDING_CONFIRMATION_EMAIL_KEY);
+          }
+        } catch {
+          // Leave registration feedback independent of storage availability.
+        }
         const diagnostic = getDevelopmentDiagnostic(error, [
           password,
           process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "",
@@ -204,6 +217,14 @@ export function CandidateWelcomeForm() {
         return;
       }
 
+      try {
+        window.localStorage.setItem(
+          PENDING_CONFIRMATION_EMAIL_KEY,
+          normalizedEmail,
+        );
+      } catch {
+        // The first-use confirmation callback does not depend on browser storage.
+      }
       setFormFeedback({
         type: "success",
         message:

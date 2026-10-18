@@ -6,6 +6,7 @@ import {
   isDemoAttempt,
 } from "@/lib/assessment/server";
 import { getAssessmentQuestionSet } from "@/lib/assessment/question-sets";
+import { serializeAssessmentResponse } from "@/lib/assessment/item-result";
 
 export async function PUT(request: Request) {
   const auth = await authenticateCandidate(request);
@@ -76,7 +77,7 @@ export async function PUT(request: Request) {
       {
         requested_attempt_id: attempt.id,
         requested_question_id: question.id,
-        requested_response: body.response,
+        requested_response: serializeAssessmentResponse(question, body.response),
       },
     );
     if (error) {
