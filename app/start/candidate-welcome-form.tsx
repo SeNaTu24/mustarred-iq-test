@@ -342,9 +342,7 @@ export function CandidateWelcomeForm() {
               <h3 id="privacy-heading">Important before registering</h3>
             </div>
             <p>
-              We use your email to create your account and link your name after
-              verification. Beginning the assessment creates your one attempt
-              and starts the 20-minute timer.
+              We use your email, name and any information provided during this assessment only for the purpose of reviewing your responses. You will receive any necessary feedback from us via the email you initially provided to us.
             </p>
           </aside>
         )}
@@ -353,10 +351,21 @@ export function CandidateWelcomeForm() {
           <label className="privacy-check">
             <input name="privacyAcknowledged" required type="checkbox" />
             <span>
-              I understand my details will be sent to Supabase to create my
-              account.
+              I understand my details will be shared with Supabase for the purpose of authenticating my details. Mustarred will delete these details from Supabase within 1 week after completion of the assessments.
             </span>
           </label>
+        )}
+        {!isSignInMode && (
+          <p>
+            <a
+              className="text-link"
+              href="https://www.mustarred.com/privacy-policy"
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              Mustarred Privacy Policy
+            </a>
+          </p>
         )}
 
         {formFeedback && (
