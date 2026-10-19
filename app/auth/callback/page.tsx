@@ -200,10 +200,10 @@ export default function AuthCallbackPage() {
       }
 
       if (outcome.kind === "invalid_link") {
-        setMessage(
-          "This confirmation link is invalid or expired. Request a new link, then open it in the browser where you registered.",
-        );
-      } else if (outcome.kind === "session_unavailable") {
+  setMessage(
+    "Your email may already be verified. Please try signing in. If you cannot sign in, request a new confirmation link.",
+  );
+} else if (outcome.kind === "session_unavailable") {
         setMessage(
           "The confirmation link could not be used in this browser. Return to candidate sign-in and finish setup there, or request a new link in the browser where you registered.",
         );
