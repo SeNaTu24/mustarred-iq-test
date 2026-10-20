@@ -9,8 +9,9 @@ CEO-approved, validated, or suitable for recruitment decisions.
   full-name metadata.
 - `public.candidates` holds the verified Auth user UUID and full name.
 - `public.assessment_attempts` holds the question-set version, server start and
-  deadline, terminal status, and submission/expiry timestamps. Its unique
-  `candidate_id` constraint allows one attempt per Auth account.
+  deadline, terminal status, submission/expiry timestamps, and (for RCAP) the
+  assigned question IDs, option orders, and unique assignment fingerprint. Its
+  unique `candidate_id` constraint allows one attempt per Auth account.
 - `public.assessment_answers` stores one row per question after finalisation,
   including an explicit `{"unanswered":true}` marker for each unanswered item.
 - `public.assessment_results` stores the total, percentage, pass/fail result,
@@ -18,7 +19,13 @@ CEO-approved, validated, or suitable for recruitment decisions.
   unanswered counts, and calculation timestamp.
 - `public.assessment_item_results` stores an auditable per-question snapshot:
   prompt/options, candidate response, protected key, correctness, point value,
-  scoring explanation, both versions, and calculation timestamp.
+  scoring explanation, both versions, and calculation timestamp. RCAP has 30
+  objective items worth four points each (120 maximum) and uses a provisional
+  24/30 (80%) pass threshold.
+- `public.assessment_security_events` stores in-attempt tab visibility and
+  window focus/blur events. These events do not affect the score. This document
+  does not define a separate retention period for them; include them in the
+  approved assessment-data retention and privacy review before real-candidate use.
 
 These records contain personal and assessment data. Use only designated test
 accounts and fictitious or authorised demo information. Do not enter actual
@@ -61,13 +68,22 @@ by this application.
 
 ## Migration prerequisite
 
-Apply the additive migrations to the intended Supabase database, in this order:
+For a fresh local/test database, review the migrations in timestamp order and
+confirm which ones are already applied before taking any operator action. The
+migration files currently include:
 
-1. `20261016170000_assessment_demo_answers_and_results.sql`
-2. `20261016172000_assessment_audit_details.sql`
-3. `20261016173000_attempt_finalization_clock_fix.sql`
+1. `20261016151000_initial_candidate_attempt_schema.sql`
+2. `20261016170000_assessment_demo_answers_and_results.sql`
+3. `20261016172000_assessment_audit_details.sql`
+4. `20261016173000_attempt_finalization_clock_fix.sql`
+5. `20261016174000_atomic_attempt_submission.sql`
+6. `20261016180000_assessment_v2_behavioral_responses.sql`
+7. `20261018104900_assessment_v3_fifty_question_support.sql`
+8. `20261018125600_assessment_security_events.sql`
+9. `20261018160000_fix_assessment_item_key_response_check.sql`
+10. `20261019143000_add_rcap_30_question_attempts.sql`
 
-The initial candidate/attempt migration is already applied and must not be
-replayed. Confirm the expected objects and grants in the selected project
-before testing. Applying migrations to the hosted project is an explicit
-operator action; this implementation does not apply them.
+Do not replay an already-applied migration. Confirm expected objects and grants
+in the intended non-production project before testing. Applying any migration,
+especially to a hosted or production project, is an explicit operator action;
+this application does not apply migrations.

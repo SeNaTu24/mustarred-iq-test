@@ -48,9 +48,12 @@ type PatternTile = {
     size?: number;
   }>;
 };
-type RoundResult = { round: number; correct: number };
+type RoundResult = { round: number; correct: number; percentage?: number };
 type AssessmentResult = {
   totalCorrect: number;
+  maxCorrect?: number;
+  marksEarned?: number | null;
+  marksPossible?: number | null;
   percentage: number;
   outcome: "PASS" | "FAIL";
   rounds: RoundResult[];
@@ -59,10 +62,12 @@ type AssessmentResult = {
 };
 type SessionPayload = {
   error?: string;
+  demoLabel?: string;
   serverNow: string;
   attempt: {
     id: string;
     status: "in_progress" | "submitted" | "expired";
+    questionSetVersion: string;
     startedAt: string;
     deadlineAt: string;
   };
@@ -181,9 +186,16 @@ export function AssessmentClient() {
     setAnswers(payload.answers ?? {});
     setSavedIds(new Set(Object.keys(payload.answers ?? {})));
     setSaveErrors({});
-    draftValuesRef.current.clear();
-    draftVersionsRef.current.clear();
-    savedVersionsRef.current.clear();
+    setMessage("");
+    if (
+      payload.attempt.status !== "in_progress" ||
+      draftValuesRef.current.size === 0
+    ) {
+      setDrafts({});
+      draftValuesRef.current.clear();
+      draftVersionsRef.current.clear();
+      savedVersionsRef.current.clear();
+    }
     setAttemptStatus(payload.attempt.status);
     setResult(payload.result);
     setServerOffsetMs(Date.parse(payload.serverNow) - Date.now());
@@ -337,13 +349,35 @@ export function AssessmentClient() {
       session
     ) {
       const timeoutId = window.setTimeout(() => {
-        void loadSession().catch((error: unknown) => {
-          setMessage(
-            error instanceof Error
-              ? error.message
-              : "Time is up, but we couldn’t load your result. Refresh to try again.",
-          );
-        });
+        void (async () => {
+          let expiryWarning = "";
+          try {
+            await autosaverRef.current?.flushAll();
+            await saveAllPendingDrafts({
+              getDrafts: () => draftValuesRef.current,
+              getVersion: (questionId) =>
+                draftVersionsRef.current.get(questionId) ?? 0,
+              getSavedVersion: (questionId) =>
+                savedVersionsRef.current.get(questionId),
+              save: (questionId, responseValue, version) =>
+                saveAnswerResponseRef.current(questionId, responseValue, version),
+            });
+          } catch {
+            expiryWarning =
+              "Time expired before all answer changes could be confirmed as saved. Your result includes answers accepted by the server before the deadline.";
+          }
+
+          try {
+            await loadSession();
+            if (expiryWarning) setMessage(expiryWarning);
+          } catch (error: unknown) {
+            setMessage(
+              error instanceof Error
+                ? error.message
+                : "Time is up, but we couldn’t load your result. Refresh to try again.",
+            );
+          }
+        })();
       }, 0);
       return () => window.clearTimeout(timeoutId);
     }
@@ -654,13 +688,11 @@ export function AssessmentClient() {
   }
 
   if (result) {
-    const roundTitles = [
-      "Pattern recognition",
-      "Reasoning and logic",
-      "Numerical and spatial games",
-      "Risk management",
-      "Workplace judgement",
-    ];
+    const roundTitles = session.questions
+      .reduce<string[]>((titles, question) => {
+        titles[question.round - 1] = question.roundTitle;
+        return titles;
+      }, []);
     return (
       <main className="demo-assessment">
         <h1>Assessment result</h1>
@@ -669,21 +701,27 @@ export function AssessmentClient() {
             ? "Your time expired. The server has saved and scored your submitted answers."
             : "Submission confirmed. The server has saved and scored your answers."}
         </p>
-        <p>Objective score</p>
+        <p>Assessment score</p>
         <p>
-          Your score: <strong>{result.totalCorrect}/50</strong> (
+          Your score: <strong>{result.totalCorrect}/{result.maxCorrect ?? 50}</strong> (
           {result.percentage}%)
+          {result.marksEarned !== null && result.marksEarned !== undefined &&
+            result.marksPossible !== null && result.marksPossible !== undefined &&
+            ` · ${result.marksEarned}/${result.marksPossible} marks`}
         </p>
         <p>
           Result: <strong>{result.outcome === "PASS" ? "Pass" : "Below pass mark"}</strong>.
-          The pass mark is 40/50. This assessment preview is not used to make
-          hiring decisions.
+          The provisional pass threshold is 80%.
         </p>
         <h2>Section scores</h2>
         <ol className="demo-round-results">
           {result.rounds.map((round) => (
             <li key={round.round}>
-              {roundTitles[round.round - 1]}: {round.correct}/10 ({round.correct * 10}%)
+              {roundTitles[round.round - 1]}: {round.correct}/
+              {result.maxCorrect === 30 ? 6 : 10} ({round.percentage ??
+                Math.round(
+                  (round.correct / (result.maxCorrect === 30 ? 6 : 10)) * 100,
+                )}%)
             </li>
           ))}
         </ol>

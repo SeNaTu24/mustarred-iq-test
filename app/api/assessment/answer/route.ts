@@ -1,11 +1,9 @@
 import {
   authenticateCandidate,
   calculateAndSaveResult,
-  finalizeAttempt,
   getOwnedAttempt,
-  isDemoAttempt,
 } from "@/lib/assessment/server";
-import { getAssessmentQuestionSet } from "@/lib/assessment/question-sets";
+import { getQuestionSetForAttempt } from "@/lib/assessment/attempt-question-set";
 import { serializeAssessmentResponse } from "@/lib/assessment/item-result";
 
 export async function PUT(request: Request) {
@@ -30,10 +28,7 @@ export async function PUT(request: Request) {
     if (!attempt) {
       return Response.json({ error: "No assessment attempt was found for your account." }, { status: 404 });
     }
-    if (!isDemoAttempt(attempt)) {
-      return Response.json({ error: "This attempt uses a different assessment version." }, { status: 409 });
-    }
-    const questionSet = getAssessmentQuestionSet(attempt.question_set_version);
+    const questionSet = await getQuestionSetForAttempt(attempt);
     if (!questionSet) {
       return Response.json({ error: "This attempt uses an unsupported assessment version." }, { status: 409 });
     }
@@ -60,14 +55,6 @@ export async function PUT(request: Request) {
       );
     }
 
-    if (
-      attempt.status === "in_progress" &&
-      Date.now() >= new Date(attempt.deadline_at).getTime()
-    ) {
-      await finalizeAttempt(supabase, attempt.id, "expired");
-      const result = await calculateAndSaveResult(supabase, attempt.id);
-      return Response.json({ error: "Time is up. Your saved answers have been scored.", result }, { status: 410 });
-    }
     if (attempt.status !== "in_progress") {
       return Response.json({ error: "This attempt is closed and can no longer accept answers." }, { status: 409 });
     }
@@ -82,7 +69,25 @@ export async function PUT(request: Request) {
     );
     if (error) {
       if (error.code === "P0001") {
-        await finalizeAttempt(supabase, attempt.id, "expired");
+        const { data: deadlineStatus, error: deadlineError } = await supabase.rpc(
+          "expire_assessment_attempt_if_due",
+          { requested_attempt_id: attempt.id },
+        );
+        if (deadlineError) {
+          throw new Error("Assessment deadline could not be confirmed.");
+        }
+        if (deadlineStatus === "submitted") {
+          return Response.json(
+            { error: "This attempt is closed and can no longer accept answers." },
+            { status: 409 },
+          );
+        }
+        if (deadlineStatus !== "expired") {
+          return Response.json(
+            { error: "This attempt is not accepting answers." },
+            { status: 409 },
+          );
+        }
         const result = await calculateAndSaveResult(supabase, attempt.id);
         return Response.json({ error: "Time is up. Your saved answers have been scored.", result }, { status: 410 });
       }

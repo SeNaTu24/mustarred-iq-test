@@ -43,7 +43,7 @@ export async function GET(request: Request) {
         ? { data: [], error: null }
         : await supabase
             .from("assessment_results")
-            .select("attempt_id, total_correct, percentage, outcome, round_1_correct, round_2_correct, round_3_correct, round_4_correct, round_5_correct, answered_count, unanswered_count, question_set_version, scoring_rule_version, calculated_at")
+            .select("attempt_id, total_correct, percentage, outcome, round_1_correct, round_2_correct, round_3_correct, round_4_correct, round_5_correct, answered_count, unanswered_count, question_set_version, scoring_rule_version, calculated_at, marks_earned, marks_possible")
             .in("attempt_id", attemptIds);
     if (resultsError) throw resultsError;
 

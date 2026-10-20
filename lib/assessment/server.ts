@@ -6,7 +6,12 @@ import {
   createAssessmentItemResult,
   restoreAssessmentResponse,
 } from "./item-result";
-import { getAssessmentQuestionSet } from "./question-sets";
+import { getQuestionSetForAttempt } from "./attempt-question-set";
+import {
+  RCAP_POINTS_PER_CORRECT,
+  RCAP_QUESTION_SET_VERSION,
+  RCAP_QUESTIONS_PER_COMPETENCY,
+} from "./rcap-constants";
 import { DEMO_QUESTION_SET_VERSION as V2_QUESTION_SET_VERSION } from "./demo-question-bank";
 
 type PersistedAssessmentResult = {
@@ -25,11 +30,17 @@ type PersistedAssessmentResult = {
   question_set_version: string;
   scoring_rule_version: string;
   calculated_at: string;
+  marks_earned?: number | null;
+  marks_possible?: number | null;
 };
 
 function presentAssessmentResult(data: PersistedAssessmentResult) {
+  const isRcap = data.question_set_version === RCAP_QUESTION_SET_VERSION;
   return {
     totalCorrect: data.total_correct,
+    maxCorrect: isRcap ? 30 : 50,
+    marksEarned: data.marks_earned ?? null,
+    marksPossible: data.marks_possible ?? null,
     percentage: data.percentage,
     outcome: data.outcome,
     answeredCount: data.answered_count,
@@ -40,12 +51,22 @@ function presentAssessmentResult(data: PersistedAssessmentResult) {
     scoringRuleVersion: data.scoring_rule_version,
     calculatedAt: data.calculated_at,
     rounds: [
-      { round: 1, correct: data.round_1_correct },
-      { round: 2, correct: data.round_2_correct },
-      { round: 3, correct: data.round_3_correct },
-      { round: 4, correct: data.round_4_correct },
-      { round: 5, correct: data.round_5_correct },
-    ],
+      data.round_1_correct,
+      data.round_2_correct,
+      data.round_3_correct,
+      data.round_4_correct,
+      data.round_5_correct,
+    ].map((correct, index) => ({
+      round: index + 1,
+      correct,
+      ...(isRcap
+        ? {
+            percentage: Number(
+              ((correct / RCAP_QUESTIONS_PER_COMPETENCY) * 100).toFixed(2),
+            ),
+          }
+        : {}),
+    })),
   };
 }
 
@@ -122,7 +143,7 @@ export async function getOwnedAttempt(candidateId: string) {
 
   const { data: attempt, error } = await supabase
     .from("assessment_attempts")
-    .select("id, candidate_id, status, started_at, deadline_at, question_set_version")
+    .select("id, candidate_id, status, started_at, deadline_at, question_set_version, assigned_question_ids, assigned_option_orders")
     .eq("candidate_id", candidateId)
     .maybeSingle();
   if (error) {
@@ -153,17 +174,20 @@ export async function calculateAndSaveResult(
 ) {
   const { data: attempt, error: attemptError } = await supabase
     .from("assessment_attempts")
-    .select("question_set_version")
+    .select("question_set_version, assigned_question_ids, assigned_option_orders")
     .eq("id", attemptId)
     .single();
   if (attemptError || !attempt) {
     throw new Error(`Attempt version lookup failed: ${attemptError?.message ?? "no attempt"}`);
   }
-  const questionSet = getAssessmentQuestionSet(attempt.question_set_version);
+  const questionSet = await getQuestionSetForAttempt(attempt);
   if (!questionSet) {
     throw new Error(`Unsupported assessment question set: ${attempt.question_set_version}`);
   }
   const usesV2Schema = questionSet.version === V2_QUESTION_SET_VERSION;
+  const pointsPerCorrect = questionSet.version === RCAP_QUESTION_SET_VERSION
+    ? RCAP_POINTS_PER_CORRECT
+    : 1;
 
   const { error: unansweredError } = await supabase.rpc(
     "record_unanswered_demo_items",
@@ -228,6 +252,7 @@ export async function calculateAndSaveResult(
       questionSetVersion: questionSet.version,
       scoringRuleVersion: questionSet.scoringRuleVersion,
       includeScoringType: usesV2Schema,
+      pointsPerCorrect,
     });
   });
   const hasResponse = (questionId: string) => {
@@ -276,6 +301,12 @@ export async function calculateAndSaveResult(
     round_5_correct: scored.rounds[4].correct,
     percentage: scored.percentage,
     outcome: scored.outcome,
+    ...(questionSet.version === RCAP_QUESTION_SET_VERSION
+      ? {
+          marks_earned: scored.marksEarned,
+          marks_possible: scored.marksPossible,
+        }
+      : {}),
     ...(usesV2Schema
       ? {
           behavioral_answered_count: behavioralAnsweredCount,
@@ -300,8 +331,4 @@ export async function calculateAndSaveResult(
     throw new Error(`Saved result retrieval failed: ${error?.message ?? "no result"}`);
   }
   return presentAssessmentResult(data as PersistedAssessmentResult);
-}
-
-export function isDemoAttempt(attempt: { question_set_version: string }) {
-  return getAssessmentQuestionSet(attempt.question_set_version) !== null;
 }

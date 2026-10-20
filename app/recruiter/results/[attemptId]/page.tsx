@@ -3,8 +3,8 @@ import { Suspense } from "react";
 import { RecruiterAttemptDetail } from "./recruiter-attempt-detail";
 
 export const metadata: Metadata = {
-  title: "Recruiter attempt detail | Mustarred",
-  description: "Restricted demo attempt and item scoring details.",
+  title: "Recruiter RCAP attempt detail | Mustarred",
+  description: "Restricted candidate RCAP assessment scoring details.",
 };
 
 export default function RecruiterAttemptPage({

@@ -2,9 +2,8 @@ import {
   authenticateCandidate,
   calculateAndSaveResult,
   getOwnedAttempt,
-  isDemoAttempt,
 } from "@/lib/assessment/server";
-import { getAssessmentQuestionSet } from "@/lib/assessment/question-sets";
+import { getQuestionSetForAttempt } from "@/lib/assessment/attempt-question-set";
 import { finalizeAndGetResult } from "@/lib/assessment/submission";
 
 export async function POST(request: Request) {
@@ -16,10 +15,7 @@ export async function POST(request: Request) {
     if (!attempt) {
       return Response.json({ error: "No assessment attempt was found for your account." }, { status: 404 });
     }
-    if (!isDemoAttempt(attempt)) {
-      return Response.json({ error: "This attempt uses a different assessment version." }, { status: 409 });
-    }
-    const questionSet = getAssessmentQuestionSet(attempt.question_set_version);
+    const questionSet = await getQuestionSetForAttempt(attempt);
     if (!questionSet) {
       return Response.json({ error: "This attempt uses an unsupported assessment version." }, { status: 409 });
     }
