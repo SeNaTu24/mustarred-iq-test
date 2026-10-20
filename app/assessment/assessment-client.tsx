@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { CandidateHeader } from "@/app/start/candidate-brand";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
   createDebouncedDraftAutosaver,
@@ -668,12 +669,18 @@ export function AssessmentClient() {
 
 
   if (isLoading) {
-    return <main className="demo-assessment"><p role="status">Loading your assessment…</p></main>;
+    return (
+      <main className="demo-assessment candidate-flow">
+        <CandidateHeader />
+        <p className="candidate-loading" role="status">Loading your assessment…</p>
+      </main>
+    );
   }
 
   if (!session) {
     return (
-      <main className="demo-assessment">
+      <main className="demo-assessment candidate-flow candidate-state-panel">
+        <CandidateHeader />
         <h1>Assessment unavailable</h1>
         <p role="alert">{message}</p>
         <p>
@@ -694,44 +701,50 @@ export function AssessmentClient() {
         return titles;
       }, []);
     return (
-      <main className="demo-assessment">
-        <h1>Assessment result</h1>
-        <p role="status" aria-live="polite">
-          {attemptStatus === "expired"
-            ? "Your time expired. The server has saved and scored your submitted answers."
-            : "Submission confirmed. The server has saved and scored your answers."}
-        </p>
-        <p>Assessment score</p>
-        <p>
-          Your score: <strong>{result.totalCorrect}/{result.maxCorrect ?? 50}</strong> (
-          {result.percentage}%)
-          {result.marksEarned !== null && result.marksEarned !== undefined &&
-            result.marksPossible !== null && result.marksPossible !== undefined &&
-            ` · ${result.marksEarned}/${result.marksPossible} marks`}
-        </p>
-        <p>
-          Result: <strong>{result.outcome === "PASS" ? "Pass" : "Below pass mark"}</strong>.
-          The provisional pass threshold is 80%.
-        </p>
-        <h2>Section scores</h2>
-        <ol className="demo-round-results">
-          {result.rounds.map((round) => (
-            <li key={round.round}>
-              {roundTitles[round.round - 1]}: {round.correct}/
-              {result.maxCorrect === 30 ? 6 : 10} ({round.percentage ??
-                Math.round(
-                  (round.correct / (result.maxCorrect === 30 ? 6 : 10)) * 100,
-                )}%)
-            </li>
-          ))}
-        </ol>
-        {(result.behavioralAnsweredCount ?? 0) > 0 && (
-          <p>
-            Work-style responses recorded: {result.behavioralAnsweredCount}/5. These
-            responses are separate from your objective score.
+      <main className="demo-assessment candidate-flow demo-result-view">
+        <CandidateHeader />
+        <section className="demo-result-summary">
+          <p className="demo-result-eyebrow">Assessment complete</p>
+          <h1>Assessment result</h1>
+          <p role="status" aria-live="polite">
+            {attemptStatus === "expired"
+              ? "Your time expired. The server has saved and scored your submitted answers."
+              : "Submission confirmed. The server has saved and scored your answers."}
           </p>
-        )}
-        <p>Attempt status: {attemptStatus === "expired" ? "Time expired" : "Submitted"}</p>
+          <p className="demo-result-score-label">Assessment score</p>
+          <p className="demo-result-score">
+            Your score: <strong>{result.totalCorrect}/{result.maxCorrect ?? 50}</strong> (
+            {result.percentage}%)
+            {result.marksEarned !== null && result.marksEarned !== undefined &&
+              result.marksPossible !== null && result.marksPossible !== undefined &&
+              ` · ${result.marksEarned}/${result.marksPossible} marks`}
+          </p>
+          <p className="demo-result-outcome">
+            Result: <strong>{result.outcome === "PASS" ? "Pass" : "Below pass mark"}</strong>.
+            The provisional pass threshold is 80%.
+          </p>
+        </section>
+        <section className="demo-result-sections" aria-labelledby="demo-result-sections-title">
+          <h2 id="demo-result-sections-title">Section scores</h2>
+          <ol className="demo-round-results">
+            {result.rounds.map((round) => (
+              <li key={round.round}>
+                {roundTitles[round.round - 1]}: {round.correct}/
+                {result.maxCorrect === 30 ? 6 : 10} ({round.percentage ??
+                  Math.round(
+                    (round.correct / (result.maxCorrect === 30 ? 6 : 10)) * 100,
+                  )}%)
+              </li>
+            ))}
+          </ol>
+          {(result.behavioralAnsweredCount ?? 0) > 0 && (
+            <p>
+              Work-style responses recorded: {result.behavioralAnsweredCount}/5. These
+              responses are separate from your objective score.
+            </p>
+          )}
+        </section>
+        <p className="demo-result-status">Attempt status: {attemptStatus === "expired" ? "Time expired" : "Submitted"}</p>
         <button className="button button-primary" onClick={() => router.push("/")} type="button">
           Return to Mustarred
         </button>
@@ -741,7 +754,8 @@ export function AssessmentClient() {
 
   if (attemptStatus !== "in_progress" || !currentQuestion) {
     return (
-      <main className="demo-assessment">
+      <main className="demo-assessment candidate-flow candidate-state-panel">
+        <CandidateHeader />
         <h1>Attempt unavailable</h1>
         <p role="alert">{message || "This attempt is no longer active."}</p>
       </main>
@@ -749,7 +763,8 @@ export function AssessmentClient() {
   }
 
   return (
-    <main className="demo-assessment">
+    <main className="demo-assessment candidate-flow">
+      <CandidateHeader />
       <header className="demo-assessment-header">
         <div>
           <h1>{currentQuestion.roundTitle}</h1>

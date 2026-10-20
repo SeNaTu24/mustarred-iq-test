@@ -1,16 +1,15 @@
+import { CandidateBrandLogo } from "./start/candidate-brand";
+
 export default function Home() {
   return (
-    <>
+    <div className="candidate-flow">
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
 
-      <header className="site-header">
-        <a className="wordmark" href="#overview" aria-label="Mustarred home">
-          <span className="wordmark-icon" aria-hidden="true">
-            m
-          </span>
-          <span>mustarred</span>
+      <header className="candidate-header">
+        <a className="candidate-brand-home" href="/" aria-label="Mustarred home">
+          <CandidateBrandLogo />
         </a>
       </header>
 
@@ -27,8 +26,7 @@ export default function Home() {
               <span>you think.</span>
             </h1>
             <p className="hero-description">
-              A 50-question assessment focused on work-related decisions,
-              reasoning, and problem-solving.
+              A 30-question professional assessment evaluating commercial awareness, risk judgement, problem-solving, execution, and emotional intelligence.
             </p>
             <div className="hero-actions">
               <a className="button button-primary" href="/start">
@@ -56,27 +54,22 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="site-footer">
-        <div className="section-shell footer-inner">
-          <a className="wordmark footer-wordmark" href="#overview">
-            <span className="wordmark-icon" aria-hidden="true">
-              m
-            </span>
-            <span>mustarred</span>
+      <footer className="candidate-footer">
+        <div className="candidate-footer-inner">
+          <a className="candidate-brand-home" href="/" aria-label="Mustarred home">
+            <CandidateBrandLogo size="footer" />
           </a>
+          <p>Thoughtful assessments. Human potential.</p>
           <a
-            className="footer-year"
+            className="landing-footer-policy"
             href="https://www.mustarred.com/privacy-policy"
             rel="noopener noreferrer"
             target="_blank"
           >
-            Mustarred Privacy Policy
-          </a>
-          <a className="footer-year" href="/recruiter/sign-in">
-            Recruiter sign in
+            Privacy Policy
           </a>
         </div>
       </footer>
-    </>
+    </div>
   );
 }

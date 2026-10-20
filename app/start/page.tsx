@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CandidateWelcomeForm } from "./candidate-welcome-form";
+import { CandidateFooter, CandidateHeader } from "./candidate-brand";
 
 export const metadata: Metadata = {
   title: "Candidate registration | Mustarred",
@@ -10,22 +11,12 @@ export const metadata: Metadata = {
 
 export default function CandidateWelcomePage() {
   return (
-    <>
+    <div className="candidate-flow">
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
 
-      <header className="site-header">
-        <Link className="wordmark" href="/" aria-label="Mustarred home">
-          <span className="wordmark-icon" aria-hidden="true">
-            m
-          </span>
-          <span>mustarred</span>
-        </Link>
-        <Link className="header-link" href="/">
-          <span aria-hidden="true">←</span> Back to overview
-        </Link>
-      </header>
+      <CandidateHeader backHref="/" backLabel="Back to overview" />
 
       <main className="welcome-main" id="main-content">
         <section className="welcome-panel" aria-labelledby="welcome-title">
@@ -70,18 +61,7 @@ export default function CandidateWelcomePage() {
         </Link>
       </main>
 
-      <footer className="site-footer">
-        <div className="section-shell footer-inner">
-          <Link className="wordmark footer-wordmark" href="/">
-            <span className="wordmark-icon" aria-hidden="true">
-              m
-            </span>
-            <span>mustarred</span>
-          </Link>
-          <p>Thoughtful assessments. Human potential.</p>
-          <span className="footer-year">CANDIDATE REGISTRATION</span>
-        </div>
-      </footer>
-    </>
+      <CandidateFooter label="CANDIDATE REGISTRATION" />
+    </div>
   );
 }

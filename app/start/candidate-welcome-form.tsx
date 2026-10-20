@@ -8,7 +8,7 @@ import { getAuthRedirectUrl } from "@/lib/supabase/auth-urls";
 import { PENDING_CONFIRMATION_EMAIL_KEY } from "@/lib/supabase/email-confirmation";
 
 const GENERIC_REGISTRATION_ERROR =
-  "We couldn’t create your account. Check your details and try again. If the problem continues, contact support.";
+  "We couldn't create your account. Check your details and try again. If the problem continues, contact support.";
 
 function getDevelopmentDiagnostic(
   error: unknown,
@@ -128,7 +128,7 @@ export function CandidateWelcomeForm() {
             message:
               errorCode === "email_not_confirmed"
                 ? "Verify your email using the latest confirmation link, then sign in."
-                : "We couldn’t sign you in. Check your email and password and try again.",
+                : "We couldn't sign you in. Check your email and password and try again.",
           });
           return;
         }
@@ -172,7 +172,7 @@ export function CandidateWelcomeForm() {
             type: "error",
             message:
               profileResult.error ??
-              "We couldn’t complete your registration. Please try again.",
+              "We couldn't complete your registration. Please try again.",
           });
           return;
         }
@@ -228,7 +228,7 @@ export function CandidateWelcomeForm() {
       setFormFeedback({
         type: "success",
         message:
-          "We’ve sent a confirmation link to your email. Open it to verify your account, then return here to sign in.",
+          "We've sent a confirmation link to your email. Open it to verify your account, then return here to sign in.",
       });
       form.reset();
     } catch (error) {
@@ -242,7 +242,7 @@ export function CandidateWelcomeForm() {
         setFormFeedback({
           type: "error",
           message:
-            "We couldn’t complete sign-in. Check your connection and try again.",
+            "We couldn't complete sign-in. Check your connection and try again.",
         });
         return;
       }
@@ -256,7 +256,7 @@ export function CandidateWelcomeForm() {
         message:
           error instanceof Error &&
           error.message.includes("NEXT_PUBLIC_SITE_URL")
-            ? "We can’t send a verification email right now. Please try again later or contact support."
+            ? "We can't send a verification email right now. Please try again later or contact support."
             : GENERIC_REGISTRATION_ERROR,
       });
     } finally {
@@ -274,7 +274,7 @@ export function CandidateWelcomeForm() {
           <h2>{isSignInMode ? "Welcome back" : "Your details"}</h2>
           <p>
             {isSignInMode
-              ? "Sign in with your verified account. We’ll check your candidate profile and finish setting it up if needed."
+              ? "Sign in with your verified account. We'll check your candidate profile and finish setting it up if needed."
               : "Register with an email address you can verify."}
           </p>
         </div>
@@ -334,104 +334,98 @@ export function CandidateWelcomeForm() {
         </div>
 
         {!isSignInMode && (
-          <aside className="privacy-notice" aria-labelledby="privacy-heading">
-            <div className="privacy-heading-row">
-              <span className="privacy-icon" aria-hidden="true">
-                ◈
-              </span>
-              <h3 id="privacy-heading">Important before registering</h3>
-            </div>
-            <p>
-              We use your email, name and any information provided during this assessment only for the purpose of reviewing your responses. You will receive any necessary feedback from us via the email you initially provided to us.
+          <div className="welcome-privacy-block">
+            <p className="welcome-data-note">
+              Your name and email are shared with Supabase solely to
+              authenticate your account. Mustarred deletes them from Supabase
+              within one week of assessment completion.
             </p>
-          </aside>
-        )}
-
-        {!isSignInMode && (
-          <label className="privacy-check">
-            <input name="privacyAcknowledged" required type="checkbox" />
-            <span>
-              I understand my details will be shared with Supabase for the purpose of authenticating my details. Mustarred will delete these details from Supabase within 1 week after completion of the assessments.
-            </span>
-          </label>
-        )}
-        {!isSignInMode && (
-          <p>
+            <label className="privacy-check">
+              <input name="privacyAcknowledged" required type="checkbox" />
+              <span>
+                I understand my details will be shared with Supabase for
+                authentication and deleted within one week of completion.
+              </span>
+            </label>
             <a
-              className="text-link"
+              className="welcome-policy-link"
               href="https://www.mustarred.com/privacy-policy"
               rel="noopener noreferrer"
               target="_blank"
             >
-              Mustarred Privacy Policy
+              Mustarred Privacy Policy →
             </a>
-          </p>
+          </div>
         )}
 
         {formFeedback && (
           <div
             className={
-              formFeedback.type === "success"
-                ? "privacy-notice"
-                : "form-error"
+              formFeedback.type === "success" ? "privacy-notice" : "form-error"
             }
             role={formFeedback.type === "success" ? "status" : "alert"}
             aria-live={formFeedback.type === "success" ? "polite" : "assertive"}
           >
             <p>{formFeedback.message}</p>
             {formFeedback.type === "success" && (
-              <p>Can’t find the email? Check your spam or junk folder.</p>
+              <p>Can&apos;t find the email? Check your spam or junk folder.</p>
             )}
           </div>
         )}
 
-        <button
-          className="button button-primary welcome-submit"
-          disabled={isSubmitting}
-          type="submit"
-        >
-          {isSubmitting
-            ? isSignInMode
-              ? "Signing in…"
-              : "Registering…"
-            : isSignInMode
-              ? "Sign in"
-              : "Register"}
-          <span className="button-arrow" aria-hidden="true">
-            →
-          </span>
-        </button>
+        <div className="welcome-form-footer">
+          <button
+            className="button button-primary welcome-submit"
+            disabled={isSubmitting}
+            type="submit"
+          >
+            {isSubmitting
+              ? isSignInMode
+                ? "Signing in…"
+                : "Registering…"
+              : isSignInMode
+                ? "Sign in"
+                : "Register"}
+            <span className="button-arrow" aria-hidden="true">
+              →
+            </span>
+          </button>
 
-        <p className="form-footnote">
-          {isSignInMode
-            ? "Your email must be verified before you can begin."
-            : "Verify your email before beginning the assessment."}{" "}
-          <Link href="/start/instructions">Review the instructions</Link>.
-        </p>
-        {!isSignInMode && (
-          <Link className="text-link" href="/auth/callback">
-            Already verified? Continue
-          </Link>
-        )}
-        {isSignInMode && (
-          <Link className="text-link" href="/auth/recover">
-            Forgot your password?
-          </Link>
-        )}
-        <button
-          className="text-link candidate-auth-toggle"
-          onClick={() => {
-            setIsSignInMode((current) => !current);
-            setNeedsProfileName(false);
-            setNameError(false);
-            setFormFeedback(null);
-          }}
-          type="button"
-        >
-          {isSignInMode
-            ? "New candidate? Register"
-            : "Already have an account? Sign in and finish setup"}
-        </button>
+          <p className="form-footnote">
+            {isSignInMode
+              ? "Your email must be verified before you can begin."
+              : "Verify your email before beginning the assessment."}{" "}
+            <Link href="/start/instructions">Review the instructions</Link>.
+          </p>
+
+          {!isSignInMode && (
+            <Link className="welcome-verified-link" href="/auth/callback">
+              Already verified? Continue →
+            </Link>
+          )}
+          {isSignInMode && (
+            <Link className="text-link" href="/auth/recover">
+              Forgot your password?
+            </Link>
+          )}
+
+          <hr className="welcome-divider" aria-hidden="true" />
+
+          <button
+            className="text-link candidate-auth-toggle"
+            onClick={() => {
+              setIsSignInMode((current) => !current);
+              setNeedsProfileName(false);
+              setNameError(false);
+              setFormFeedback(null);
+            }}
+            type="button"
+          >
+            {isSignInMode
+              ? "New candidate? Register"
+              : "Already have an account? Sign in and finish setup"}
+          </button>
+        </div>
       </form>
     </div>
   );

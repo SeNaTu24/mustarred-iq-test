@@ -57,9 +57,7 @@ export function RecruiterSignIn() {
 
   return (
     <main className="recruiter-page">
-      <div className="demo-data-banner">
-        RESTRICTED REVIEWER ACCESS — temporary demo data only
-      </div>
+      
       <h1>Recruiter sign in</h1>
       <p>
         Sign in with a verified Supabase account that has been assigned the
