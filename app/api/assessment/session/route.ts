@@ -1,11 +1,9 @@
 import {
   authenticateCandidate,
   calculateAndSaveResult,
-  finalizeAttempt,
   getOwnedAttempt,
-  isDemoAttempt,
 } from "@/lib/assessment/server";
-import { getAssessmentQuestionSet } from "@/lib/assessment/question-sets";
+import { getQuestionSetForAttempt } from "@/lib/assessment/attempt-question-set";
 import { restoreAssessmentResponse } from "@/lib/assessment/item-result";
 
 export async function GET(request: Request) {
@@ -20,15 +18,7 @@ export async function GET(request: Request) {
         { status: 404 },
       );
     }
-    if (!isDemoAttempt(attempt)) {
-      return Response.json(
-        {
-          error: "This attempt uses a different assessment version.",
-        },
-        { status: 409 },
-      );
-    }
-    const questionSet = getAssessmentQuestionSet(attempt.question_set_version);
+    const questionSet = await getQuestionSetForAttempt(attempt);
     if (!questionSet) {
       return Response.json(
         { error: "This attempt uses an unsupported assessment version." },
@@ -38,12 +28,18 @@ export async function GET(request: Request) {
     questionSet.validate();
 
     let status = attempt.status;
-    if (
-      status === "in_progress" &&
-      Date.now() >= new Date(attempt.deadline_at).getTime()
-    ) {
-      await finalizeAttempt(supabase, attempt.id, "expired");
-      status = "expired";
+    if (status === "in_progress") {
+      const { data: deadlineStatus, error: deadlineError } = await supabase.rpc(
+        "expire_assessment_attempt_if_due",
+        { requested_attempt_id: attempt.id },
+      );
+      if (
+        deadlineError ||
+        !["in_progress", "expired", "submitted"].includes(String(deadlineStatus))
+      ) {
+        throw new Error("Assessment deadline status could not be confirmed.");
+      }
+      status = deadlineStatus as typeof status;
     }
 
     const { data: answerRows, error: answersError } = await supabase
@@ -76,14 +72,11 @@ export async function GET(request: Request) {
       attempt: {
         id: attempt.id,
         status,
+        questionSetVersion: attempt.question_set_version,
         startedAt: attempt.started_at,
         deadlineAt: attempt.deadline_at,
       },
-      questions: questionSet.questions.flatMap((question, index) =>
-        question.scoringType === "objective"
-          ? [questionSet.publicQuestions[index]]
-          : [],
-      ),
+      questions: questionSet.publicQuestions,
       answers,
       result,
     });

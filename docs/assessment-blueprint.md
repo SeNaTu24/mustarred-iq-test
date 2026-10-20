@@ -1,11 +1,13 @@
 # Mustarred Talent Assessment Blueprint
 
-**Status:** Internal draft for product, subject-matter, accessibility, and
-usability review. None of the questions or scoring rules in this document are
-implemented in the application or validated for hiring use.
+**Status:** Historical 50-item product proposal. This document is retained for
+reference only; its question set, timing, and scoring are not the current
+assessment. The implemented RCAP flow is documented in the repository README and
+source. Neither the historical proposal nor the RCAP assessment has been
+validated for hiring use.
 
-**Purpose:** Specify a proposed 50-item assessment before implementing scored
-questions, a timer, persistence, or results.
+**Purpose:** Preserve the original 50-item concept and review considerations.
+Do not use its format or rules to configure current assessment attempts.
 
 ## 1. Assessment rules
 
@@ -265,7 +267,11 @@ review must occur before freezing a scoring key. Personality and
 emotional-intelligence round scores must not be described as diagnoses,
 validated traits, or stable individual characteristics.
 
-## 6. Recommended technical implementation (future phase; not implemented)
+## 6. Historical technical recommendations
+
+The items in this section describe the original proposal and are not a complete
+specification of the current RCAP implementation. Consult the application source
+and current project documentation for implemented behavior.
 
 - Keep the present landing, welcome, and instructions previews intact. Build a
   separate assessment experience only after this blueprint and the candidate
@@ -339,19 +345,22 @@ Before production question authoring or implementation, review and decide:
    mechanical pass/fail, and round scores as requested; confirm any explanatory
    text and who else can see them.
 
-## 8. Existing implementation status
+## 8. Current implementation status
 
-The current application uses Next.js App Router, React, and TypeScript. It has
-a public landing page (`app/page.tsx`), a local-only welcome preview
-(`app/start/page.tsx` and `app/start/candidate-welcome-form.tsx`), and
-instructions with an unscored practice question
-(`app/start/instructions/page.tsx` and
-`app/start/instructions/candidate-practice.tsx`). Shared visual styling is in
-`app/globals.css`. The welcome form and practice interaction do not create an
-attempt or persist personal information or answers.
+The current application uses Next.js App Router, React, and TypeScript. New
+candidate attempts use the server-scored RCAP flow: a 30-question assignment
+from a private 200-question examiner bank, with six items per competency and a
+12-minute server-enforced deadline. The assignment, option order, answers, and
+results are persisted through authenticated server routes and Supabase RPCs.
+The recruiter area provides protected result listings and per-attempt details.
 
-There is no scored question engine, production question bank, server timer,
-answer persistence, one-attempt enforcement, database, server-side scoring,
-candidate results page, or recruiter dashboard. This document adds a proposal
-only; it does not change the candidate-facing pages or install/configure
-anything.
+The historical 50-item proposal above does not describe the current assessment
+format. The private examiner bank is excluded from source control and is required
+at runtime; see the repository README for local configuration. This document is
+not an operational schema or migration guide. No migration is applied by the
+application, and production use requires separate review and approval.
+
+The current RCAP scoring threshold and question bank are provisional and have
+not been validated for hiring use. Accessibility, accommodations, fairness, bias,
+retention, privacy notice, and suitability for recruitment decisions remain
+subject to the reviews and approval gates described above.

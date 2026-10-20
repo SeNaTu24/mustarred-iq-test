@@ -10,6 +10,7 @@ import {
   scoreDemoResponse,
   validateDemoBank,
 } from "./demo-question-bank-v3";
+import { RCAP_QUESTION_SET_VERSION } from "./rcap-constants";
 import {
   DEMO_QUESTION_SET_VERSION as V2_VERSION,
   DEMO_SCORING_RULE_VERSION as V2_SCORING_RULE_VERSION,
@@ -35,6 +36,9 @@ export type AssessmentQuestion = {
   roundTitle: string;
   format: string;
   scoringType: "objective" | "behavioral";
+  competency?: string;
+  questionType?: "Abstract" | "Practical";
+  difficulty?: "Hard" | "Exceptionally hard";
   text: string;
   options?: Array<{ id: string; label: string }>;
   visual?: unknown;
@@ -45,6 +49,9 @@ export type AssessmentQuestion = {
 
 export type AssessmentScore = {
   totalCorrect: number;
+  maxCorrect?: number;
+  marksEarned?: number;
+  marksPossible?: number;
   percentage: number;
   outcome: "PASS" | "FAIL";
   rounds: Array<{ round: number; correct: number; percentage?: number }>;
@@ -154,5 +161,6 @@ export function getAssessmentQuestionSet(version: string): AssessmentQuestionSet
   if (version === CURRENT_VERSION) return currentSet;
   if (version === V2_VERSION) return v2Set;
   if (version === LEGACY_VERSION) return legacySet;
+  if (version === RCAP_QUESTION_SET_VERSION) return null;
   return null;
 }

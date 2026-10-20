@@ -37,6 +37,9 @@ yarn-error.log*
 /scripts/reset-demo-candidate-password.mjs
 /scripts/set-recruiter-role.mjs
 
+# Confidential RCAP candidate and examiner source files; provide securely at runtime
+/assessment-data/
+
 # vercel
 .vercel
 

@@ -17,9 +17,10 @@ type CandidateResultRow = {
     submittedAt: string | null;
     expiredAt: string | null;
     questionSetVersion: string;
-    result: null | {
-      total_correct: number;
-      percentage: number;
+  result: null | {
+    question_set_version: string;
+    total_correct: number;
+    percentage: number;
       outcome: string;
       round_1_correct: number;
       round_2_correct: number;
@@ -28,6 +29,8 @@ type CandidateResultRow = {
       round_5_correct: number;
       unanswered_count: number;
       scoring_rule_version: string;
+      marks_earned: number | null;
+      marks_possible: number | null;
     };
   };
 };
@@ -81,10 +84,10 @@ export function RecruiterResults() {
   return (
     <main className="recruiter-page">
       <div className="demo-data-banner">
-        TEMPORARY DEMO DATA — candidate details and scores are not for hiring decisions
+        Candidate assessment results — restricted to authorised recruiters
       </div>
       <p><Link href="/recruiter/sign-in">Recruiter sign in</Link></p>
-      <h1>Candidate demo results</h1>
+      <h1>Candidate assessment results</h1>
       <p>
         Restricted to verified Supabase Auth users assigned the recruiter role
         in trusted app metadata.
@@ -114,7 +117,7 @@ export function RecruiterResults() {
                   <td>{candidate.attempt?.status ?? "Not started"}</td>
                   <td>
                     {candidate.attempt?.result
-                      ? `${candidate.attempt.result.total_correct}/50 · ${candidate.attempt.result.percentage}% · ${candidate.attempt.result.outcome}`
+                      ? `${candidate.attempt.result.total_correct}/${candidate.attempt.result.question_set_version === "mustarred-rcap-200-v1" ? 30 : 50} · ${candidate.attempt.result.percentage}% · ${candidate.attempt.result.outcome}${candidate.attempt.result.marks_earned === null ? "" : ` · ${candidate.attempt.result.marks_earned}/${candidate.attempt.result.marks_possible} marks`}`
                       : "Not finalised"}
                   </td>
                   <td>

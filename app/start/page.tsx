@@ -58,7 +58,7 @@ export default function CandidateWelcomePage() {
             </div>
             <p className="welcome-not-live">
               <span aria-hidden="true">✳</span>
-              Your 20-minute timer starts when you begin the assessment.
+              Your timer starts when you begin; existing attempts keep their original deadline.
             </p>
           </div>
 

@@ -7,17 +7,17 @@ import ts from "typescript";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-test("candidate instructions state the time, attempt, pass mark, and actual v1 question formats", async () => {
+test("candidate instructions state RCAP timing, assignment balance, attempt and provisional threshold", async () => {
   const source = await readFile(
     resolve(projectRoot, "app", "start", "instructions", "page.tsx"),
     "utf8",
   );
-  assert.match(source, /20 minutes/);
+  assert.match(source, /12 minutes/);
+  assert.match(source, /30 questions/);
+  assert.match(source, /6 questions in each category/i);
   assert.match(source, /one attempt/i);
-  assert.match(source, /40\/50 \(80%\)/);
-  assert.match(source, /multiple-choice workplace\s+scenarios/i);
-  assert.match(source, /number and pattern sequences/i);
-  assert.match(source, /ordering actions, prioritising work, and allocating\s+resources/i);
+  assert.match(source, /24 out of 30 \(80%\)/);
+  assert.match(source, /abstract reasoning and practical scenarios/i);
 });
 
 test("candidate only sees results after confirmed terminal submission and requests time out", async () => {
@@ -130,6 +130,9 @@ test("the previous 55-item v2 bank remains available for existing attempts", () 
   assert.equal(previousV2.demoQuestions.length, 55);
   assert.equal(previousV2.demoQuestions.filter((question) => question.scoringType === "objective").length, 50);
   assert.equal(previousV2.demoQuestions.filter((question) => question.scoringType === "behavioral").length, 5);
+  const publicV2Questions = previousV2.demoQuestions.map(previousV2.getPublicDemoQuestion);
+  assert.equal(publicV2Questions.length, 55);
+  assert.equal(publicV2Questions.filter((question) => question.responseType === "behavioral").length, 5);
   assert.equal(previousV2.DEMO_QUESTION_SET_VERSION, "mustarred-assessment-2026-10-v2");
   assert.equal(current.DEMO_QUESTION_SET_VERSION, "mustarred-assessment-2026-10-v3");
 });
@@ -514,20 +517,23 @@ test("migration retains the v1 count and supports v2 behavioral snapshots withou
   assert.match(v3Migration, /mustarred-assessment-2026-10-v2' then\s+expected_count := 55/s);
 });
 
-test("new attempts use the validated v3 bank and retain recruiter result compatibility", async () => {
+test("new attempts use versioned RCAP assignment while recruiter results remain compatible", async () => {
   const beginRoute = await readFile(
     resolve(projectRoot, "app", "api", "assessment", "begin", "route.ts"),
     "utf8",
   );
-  assert.match(beginRoute, /from "@\/lib\/assessment\/demo-question-bank-v3"/);
-  assert.match(beginRoute, /validateDemoBank\(\)/);
-  assert.match(beginRoute, /requested_question_set_version: DEMO_QUESTION_SET_VERSION/);
+  assert.match(beginRoute, /loadRcapQuestionBank\(\)/);
+  assert.match(beginRoute, /allocateUniqueRcapAssignment\(/);
+  assert.match(beginRoute, /begin_rcap_assessment_attempt/);
+  assert.match(beginRoute, /randomInt\(maxExclusive\)/);
+  assert.match(beginRoute, /requested_assignment_fingerprint/);
 
   const sessionRoute = await readFile(
     resolve(projectRoot, "app", "api", "assessment", "session", "route.ts"),
     "utf8",
   );
-  assert.match(sessionRoute, /question\.scoringType === "objective"/);
+  assert.match(sessionRoute, /questions:\s*questionSet\.publicQuestions/);
+  assert.doesNotMatch(sessionRoute, /question\.scoringType === "objective"/);
 
   const recruiterRoute = await readFile(
     resolve(projectRoot, "app", "api", "recruiter", "results", "route.ts"),

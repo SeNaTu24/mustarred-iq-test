@@ -149,7 +149,7 @@ export function CandidatePractice() {
         <div className="assessment-continue-copy">
           <span className="continue-step">UP NEXT</span>
           <p>
-            You have one attempt. The 20-minute timer starts when you begin.
+            You have one attempt. The timer starts when you begin; existing attempts keep their original deadline.
           </p>
           {!attempt && (
             <p className="continue-status" role="status" aria-live="polite">

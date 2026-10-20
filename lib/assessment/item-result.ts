@@ -4,6 +4,9 @@ export type AssessmentItemResultQuestion = {
   roundTitle: string;
   format: string;
   scoringType: "objective" | "behavioral";
+  competency?: string;
+  questionType?: "Abstract" | "Practical";
+  difficulty?: "Hard" | "Exceptionally hard";
   text: string;
   options?: unknown;
   visual?: unknown;
@@ -58,6 +61,7 @@ export function createAssessmentItemResult({
   questionSetVersion,
   scoringRuleVersion,
   includeScoringType = true,
+  pointsPerCorrect = 1,
 }: {
   attemptId: string;
   question: AssessmentItemResultQuestion;
@@ -67,6 +71,7 @@ export function createAssessmentItemResult({
   questionSetVersion: string;
   scoringRuleVersion: string;
   includeScoringType?: boolean;
+  pointsPerCorrect?: number;
 }) {
   const isBehavioral = question.scoringType === "behavioral";
   const keyResponse = isBehavioral
@@ -82,6 +87,9 @@ export function createAssessmentItemResult({
     question_format: question.format,
     question_snapshot: {
       roundTitle: question.roundTitle,
+      ...(question.competency ? { competency: question.competency } : {}),
+      ...(question.questionType ? { questionType: question.questionType } : {}),
+      ...(question.difficulty ? { difficulty: question.difficulty } : {}),
       prompt: question.text,
       options: question.options ?? null,
       visual: question.visual ?? null,
@@ -92,7 +100,7 @@ export function createAssessmentItemResult({
     ...(includeScoringType ? { scoring_type: question.scoringType } : {}),
     key_response: keyResponse,
     is_correct: isBehavioral ? null : isCorrect,
-    points: isBehavioral ? null : isCorrect ? 1 : 0,
+    points: isBehavioral ? null : isCorrect ? pointsPerCorrect : 0,
     scoring_explanation: scoringExplanation,
     question_set_version: questionSetVersion,
     scoring_rule_version: scoringRuleVersion,

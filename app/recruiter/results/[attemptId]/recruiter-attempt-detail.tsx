@@ -16,8 +16,11 @@ type RecruiterDetail = {
     questionSetVersion: string;
   };
   result: null | {
+    question_set_version: string;
     total_correct: number;
     percentage: number;
+    marks_earned: number | null;
+    marks_possible: number | null;
     outcome: string;
     round_1_correct: number;
     round_2_correct: number;
@@ -37,6 +40,10 @@ type RecruiterDetail = {
     question_format: string;
     question_snapshot: {
       prompt: string;
+      roundTitle?: string;
+      competency?: string;
+      questionType?: string;
+      difficulty?: string;
       options: Array<{ id: string; label: string }> | null;
       scoringType?: "objective" | "behavioral";
       game: unknown;
@@ -125,20 +132,30 @@ export function RecruiterAttemptDetail({ attemptId }: { attemptId: string }) {
           <p>{detail.candidate.email ?? "Email unavailable"} · Attempt {detail.attempt.status}</p>
           {detail.result ? (
             <section className="recruiter-summary">
-              <h2>Objective section scores</h2>
+              <h2>Assessment section scores</h2>
               {[
                 detail.result.round_1_correct,
                 detail.result.round_2_correct,
                 detail.result.round_3_correct,
                 detail.result.round_4_correct,
                 detail.result.round_5_correct,
-              ].map((score, index) => ({ round: index + 1, score })).map(({ round, score }) => (
-                <span className="recruiter-round-score" key={round}>
-                  Round {round}: {score}/10
-                </span>
-              ))}
+              ].map((score, index) => ({ round: index + 1, score })).map(({ round, score }) => {
+                const title = detail.items.find((item) => item.round_number === round)
+                  ?.question_snapshot.roundTitle ?? `Round ${round}`;
+                const questionCount = detail.attempt.questionSetVersion === "mustarred-rcap-200-v1" ? 6 : 10;
+                const percentage = detail.attempt.questionSetVersion === "mustarred-rcap-200-v1"
+                  ? Number(((score / questionCount) * 100).toFixed(2))
+                  : score * 10;
+                return (
+                  <span className="recruiter-round-score" key={round}>
+                    {title}: {score}/{questionCount} ({percentage}%)
+                  </span>
+                );
+              })}
               <h2>
-                {detail.result.total_correct}/50 · {detail.result.percentage}% · {detail.result.outcome}
+                {detail.result.total_correct}/{detail.result.question_set_version === "mustarred-rcap-200-v1" ? 30 : 50}
+                {detail.result.marks_earned !== null && ` · ${detail.result.marks_earned}/${detail.result.marks_possible} marks`}
+                {` · ${detail.result.percentage}% · ${detail.result.outcome}`}
               </h2>
               <p>Question set: {detail.attempt.questionSetVersion}</p>
               <p>Scoring rule: {detail.result.scoring_rule_version}</p>
@@ -161,10 +178,10 @@ export function RecruiterAttemptDetail({ attemptId }: { attemptId: string }) {
             {detail.items.map((item) => (
               <li key={item.question_id}>
                 <h3>
-                  {item.question_id} · Round {item.round_number} · {item.question_format}
+                  {item.question_id} · {item.question_snapshot.competency ?? `Round ${item.round_number}`} · {item.question_format}
                   {item.scoring_type === "behavioral"
                     ? " · Unscored work-style response"
-                    : ` · ${item.points ?? 0}/1 point`}
+                    : ` · ${item.points ?? 0}/${detail.attempt.questionSetVersion === "mustarred-rcap-200-v1" ? 4 : 1} points`}
                 </h3>
                 <p>{item.question_snapshot.prompt}</p>
                 {item.question_snapshot.options && (
