@@ -1,6 +1,7 @@
 import { randomInt } from "node:crypto";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { loadRcapQuestionBank } from "@/lib/assessment/rcap-bank";
+import { RcapBankSourceError } from "@/lib/assessment/rcap-bank-source";
 import {
   allocateUniqueRcapAssignment,
   type RcapAssignment,
@@ -162,10 +163,10 @@ export async function POST(request: Request) {
       { status: allocation.alreadyStarted ? 200 : 201 },
     );
   } catch (error) {
-    console.error(
-      "Assessment begin request failed:",
-      error instanceof Error ? error.name : "Unknown error",
-    );
+    const diagnostic = error instanceof RcapBankSourceError
+      ? { category: error.category, reasonCode: error.reasonCode }
+      : { category: "begin_request", reasonCode: "unexpected_failure" };
+    console.error("Assessment begin request failed:", diagnostic);
     return Response.json(
       { error: "We couldn’t start your assessment. Please try again." },
       { status: 500 },

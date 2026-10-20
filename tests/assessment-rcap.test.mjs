@@ -625,15 +625,23 @@ test("production requires an explicit private-storage workbook location", () => 
   );
   assert.throws(
     () => resolveRcapBankSource({ NODE_ENV: "production" }, "unused-local-path.xlsx"),
-    (error) => error instanceof RcapBankSourceError && /required in production/.test(error.message),
+    (error) =>
+      error instanceof RcapBankSourceError &&
+      /required in production/.test(error.message) &&
+      error.category === "configuration" &&
+      error.reasonCode === "storage_location_missing",
   );
   assert.throws(
     () => resolveRcapBankSource({ NODE_ENV: "production", RCAP_BANK_STORAGE_BUCKET: "rcap-private" }, "unused-local-path.xlsx"),
-    (error) => error instanceof RcapBankSourceError && /Set both/.test(error.message),
+    (error) =>
+      error instanceof RcapBankSourceError &&
+      /Set both/.test(error.message) &&
+      error.category === "configuration" &&
+      error.reasonCode === "storage_location_incomplete",
   );
 });
 
-test("private-storage workbook download rejects public, missing, and empty sources safely", async () => {
+test("private-storage workbook failures use fixed category and reason codes", async () => {
   let downloadCalls = 0;
   const publicStorage = {
     getBucket: async () => ({ data: { public: true }, error: null }),
@@ -646,22 +654,53 @@ test("private-storage workbook download rejects public, missing, and empty sourc
   };
   await assert.rejects(
     downloadRcapBankFromPrivateStorage(publicStorage, "private-bucket", "private-object"),
-    (error) => error instanceof RcapBankSourceError && /must exist and be private/.test(error.message),
+    (error) =>
+      error instanceof RcapBankSourceError &&
+      error.category === "bucket" &&
+      error.reasonCode === "bucket_not_private",
   );
   assert.equal(downloadCalls, 0);
+
+  const throwingBucketStorage = {
+    getBucket: async () => {
+      throw new Error("do-not-leak-bucket-error");
+    },
+    from: () => ({ download: async () => ({ data: null, error: null }) }),
+  };
+  await assert.rejects(
+    downloadRcapBankFromPrivateStorage(throwingBucketStorage, "private-bucket", "private-object"),
+    (error) =>
+      error instanceof RcapBankSourceError &&
+      error.category === "bucket" &&
+      error.reasonCode === "bucket_lookup_failed" &&
+      !error.message.includes("do-not-leak-bucket-error"),
+  );
+
+  const missingBucketStorage = {
+    getBucket: async () => ({ data: null, error: new Error("do-not-leak-bucket-error") }),
+    from: () => ({ download: async () => ({ data: null, error: null }) }),
+  };
+  await assert.rejects(
+    downloadRcapBankFromPrivateStorage(missingBucketStorage, "private-bucket", "private-object"),
+    (error) =>
+      error instanceof RcapBankSourceError &&
+      error.category === "bucket" &&
+      error.reasonCode === "bucket_lookup_failed",
+  );
 
   const brokenStorage = {
     getBucket: async () => ({ data: { public: false }, error: null }),
     from: () => ({
-      download: async () => ({ data: null, error: new Error("do-not-leak-private-storage-error") }),
+      download: async () => ({ data: null, error: new Error("do-not-leak-object-error") }),
     }),
   };
   await assert.rejects(
     downloadRcapBankFromPrivateStorage(brokenStorage, "private-bucket", "private-object"),
     (error) =>
       error instanceof RcapBankSourceError &&
-      /could not be retrieved/.test(error.message) &&
-      !error.message.includes("do-not-leak-private-storage-error"),
+      error.category === "object" &&
+      error.reasonCode === "object_download_failed" &&
+      !error.message.includes("do-not-leak-object-error"),
   );
 
   const emptyStorage = {
@@ -675,17 +714,37 @@ test("private-storage workbook download rejects public, missing, and empty sourc
   };
   await assert.rejects(
     downloadRcapBankFromPrivateStorage(emptyStorage, "private-bucket", "private-object"),
-    (error) => error instanceof RcapBankSourceError && /could not be retrieved/.test(error.message),
+    (error) =>
+      error instanceof RcapBankSourceError &&
+      error.category === "object" &&
+      error.reasonCode === "object_empty",
   );
 });
 
-test("workbook loader uses server-only admin storage and no public asset URL", async () => {
-  const source = await readFile(resolve(projectRoot, "lib/assessment/rcap-bank.ts"), "utf8");
-  assert.match(source, /^import "server-only";/);
-  assert.match(source, /getSupabaseAdminClient\(\)\.storage/);
-  assert.match(source, /downloadRcapBankFromPrivateStorage\(/);
-  assert.match(source, /resolveRcapBankSource\(/);
-  assert.doesNotMatch(source, /NEXT_PUBLIC_.*(?:BANK|STORAGE)/);
+test("workbook and begin failures log only fixed diagnostics and preserve the response", async () => {
+  const loader = await readFile(resolve(projectRoot, "lib/assessment/rcap-bank.ts"), "utf8");
+  assert.match(loader, /^import "server-only";/);
+  assert.match(loader, /getSupabaseAdminClient\(\)\.storage/);
+  assert.match(loader, /downloadRcapBankFromPrivateStorage\(/);
+  assert.match(loader, /resolveRcapBankSource\(/);
+  assert.match(loader, /"workbook",\s*"workbook_parse_or_validation_failed"/);
+  assert.doesNotMatch(loader, /NEXT_PUBLIC_.*(?:BANK|STORAGE)/);
+
+  const begin = await readFile(resolve(projectRoot, "app/api/assessment/begin/route.ts"), "utf8");
+  const diagnosticStart = begin.indexOf("const diagnostic = error instanceof RcapBankSourceError");
+  const responseStart = begin.indexOf("return Response.json(", diagnosticStart);
+  const diagnosticBlock = begin.slice(diagnosticStart, responseStart);
+  assert.ok(diagnosticStart >= 0 && responseStart > diagnosticStart);
+  assert.match(diagnosticBlock, /category: error\.category/);
+  assert.match(diagnosticBlock, /reasonCode: error\.reasonCode/);
+  assert.match(diagnosticBlock, /category: "begin_request"/);
+  assert.match(diagnosticBlock, /reasonCode: "unexpected_failure"/);
+  assert.match(diagnosticBlock, /console\.error\("Assessment begin request failed:", diagnostic\)/);
+  assert.doesNotMatch(diagnosticBlock, /error\.(?:message|stack|cause)/);
+  assert.match(
+    begin,
+    /error:\s*"We couldn’t start your assessment\. Please try again\."\s*\},\s*\{\s*status:\s*500/,
+  );
 });
 
 test("answer RPC correction avoids PL/pgSQL variable-column ambiguity", async () => {

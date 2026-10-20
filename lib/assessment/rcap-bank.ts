@@ -65,6 +65,8 @@ export async function loadRcapQuestionBank() {
       if (error instanceof RcapBankSourceError) throw error;
       throw new RcapBankSourceError(
         `The private question bank for ${RCAP_QUESTION_SET_VERSION} is unavailable in this environment.`,
+        "workbook",
+        "workbook_parse_or_validation_failed",
       );
     });
   }
