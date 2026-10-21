@@ -719,7 +719,8 @@ export function AssessmentClient() {
             The provisional pass threshold is 80%.
           </p>
         </section>
-        <section className="demo-result-sections" aria-labelledby="demo-result-sections-title">
+
+      {/* <section className="demo-result-sections" aria-labelledby="demo-result-sections-title">
           <h2 id="demo-result-sections-title">Section scores</h2>
           <ol className="demo-round-results">
             {result.rounds.map((round) => (
@@ -739,6 +740,7 @@ export function AssessmentClient() {
             </p>
           )}
         </section>
+        */}
         <p className="demo-result-status">Attempt status: {attemptStatus === "expired" ? "Time expired" : "Submitted"}</p>
       </main>
     );

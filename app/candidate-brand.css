@@ -246,14 +246,19 @@ body:has(.demo-assessment.candidate-flow) {
   color: var(--candidate-deep);
 }
 
+
 .candidate-flow .welcome-form-heading > p:last-child,
 .candidate-flow .assessment-fact small,
 .candidate-flow .form-footnote,
 .candidate-flow .form-field label,
-.candidate-flow .privacy-check,
-.candidate-flow .privacy-notice p {
+.candidate-flow .privacy-check {
   color: var(--candidate-muted);
 }
+
+.candidate-flow .privacy-notice p {
+  color: var(--candidate-deep);
+}
+
 
 .candidate-flow .form-field input {
   border-color: #d9d8e4;
@@ -1034,10 +1039,10 @@ body:has(.demo-assessment.candidate-flow) {
 }
 
 .demo-assessment.candidate-flow .demo-security-notice-amber {
-  border-color: #e8dfc0;
-  border-left-color: #b07d20;
-  background: #fdf8ec;
-  color: #3d2e0a;
+  border-color: #f0d48a;
+  border-left-color: #b7791f;
+  background: #ff7e6f;
+  color: #493510;
 }
 
 .demo-assessment.candidate-flow .demo-security-notice p {

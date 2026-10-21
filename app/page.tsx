@@ -26,12 +26,7 @@ export default function Home() {
               Take these 30-question professional assessment and answer as many questions correctly as possible
             </p>
             <div className="hero-actions">
-              <a className="button button-primary" href="/start">
-                Register or sign in
-                <span className="button-arrow" aria-hidden="true">
-                  â†’
-                </span>
-              </a>
+            <a className="button button-primary" href="/start">Get Started</a>
             </div>
           </div>
 
