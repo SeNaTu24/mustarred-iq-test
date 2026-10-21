@@ -252,7 +252,7 @@ export default function AuthCallbackPage() {
             <p className="eyebrow section-eyebrow">Email verified</p>
             <h1 className="callback-heading">Your email is confirmed</h1>
             <p className="callback-body">
-              Your account is ready. Continue to the assessment instructions.
+              Your account is ready. Continue to the assessment section.
             </p>
             <Link className="button button-primary callback-action" href="/start/instructions">
               Continue to assessment →
@@ -306,8 +306,8 @@ export default function AuthCallbackPage() {
               >
                 {state.message}
               </p>
-              <Link className="button button-primary callback-action" href="/start">
-                Go to sign in →
+              <Link className="button button-primary callback-action" href="/start?mode=signin">
+               Sign in 
               </Link>
             </div>
           )}
@@ -317,3 +317,4 @@ export default function AuthCallbackPage() {
     </div>
   );
 }
+
