@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CandidateHeader } from "@/app/start/candidate-brand";
+import { CandidateBrandLogo, CandidateHeader } from "@/app/start/candidate-brand";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
   createDebouncedDraftAutosaver,
@@ -164,6 +164,7 @@ export function AssessmentClient() {
   >(null);
   const [securityWarning, setSecurityWarning] = useState(false);
   const [securityEventLoggingFailed, setSecurityEventLoggingFailed] = useState(false);
+  const [showSubmitDialog, setShowSubmitDialog] = useState(false);
 
   const loadSession = useCallback(async () => {
     const {
@@ -539,13 +540,7 @@ export function AssessmentClient() {
       attemptStatus !== "in_progress" ||
       isSubmittingRef.current
     ) return;
-    if (
-      !window.confirm(
-        "Submit your assessment now? Unsaved answers will be saved first. Unanswered questions score zero.",
-      )
-    ) {
-      return;
-    }
+    setShowSubmitDialog(false);
     isSubmittingRef.current = true;
     setMessage("");
     setIsSubmitting(true);
@@ -671,7 +666,7 @@ export function AssessmentClient() {
   if (isLoading) {
     return (
       <main className="demo-assessment candidate-flow">
-        <CandidateHeader />
+        <header className="candidate-header"><CandidateBrandLogo /></header>
         <p className="candidate-loading" role="status">Loading your assessment…</p>
       </main>
     );
@@ -702,7 +697,7 @@ export function AssessmentClient() {
       }, []);
     return (
       <main className="demo-assessment candidate-flow demo-result-view">
-        <CandidateHeader />
+        <header className="candidate-header"><CandidateBrandLogo /></header>
         <section className="demo-result-summary">
           <p className="demo-result-eyebrow">Assessment complete</p>
           <h1>Assessment result</h1>
@@ -745,9 +740,6 @@ export function AssessmentClient() {
           )}
         </section>
         <p className="demo-result-status">Attempt status: {attemptStatus === "expired" ? "Time expired" : "Submitted"}</p>
-        <button className="button button-primary" onClick={() => router.push("/")} type="button">
-          Return to Mustarred
-        </button>
       </main>
     );
   }
@@ -764,7 +756,7 @@ export function AssessmentClient() {
 
   return (
     <main className="demo-assessment candidate-flow">
-      <CandidateHeader />
+      <header className="candidate-header"><CandidateBrandLogo /></header>
       <header className="demo-assessment-header">
         <div>
           <h1>{currentQuestion.roundTitle}</h1>
@@ -777,12 +769,9 @@ export function AssessmentClient() {
         Question {currentIndex + 1} of {session.questions.length} · {answeredCount} saved
       </p>
       {securityWarning && (
-        <aside className="demo-security-notice" role="status" aria-live="polite">
-          <p>
-            We noticed the assessment window lost visibility or focus. Please keep
-            this window active while you work. This does not affect your score or
-            submission.
-          </p>
+        <aside className="demo-security-notice demo-security-notice-amber" role="status" aria-live="polite">
+          <p><strong>Please keep your assessment in focus.</strong></p>
+          <p>Your assessment window lost focus. Return to this window and continue your assessment.</p>
           {securityEventLoggingFailed && (
             <p>
               This activity could not be recorded right now. Your assessment remains
@@ -790,7 +779,7 @@ export function AssessmentClient() {
             </p>
           )}
           <button onClick={() => setSecurityWarning(false)} type="button">
-            Dismiss notice
+            I understand
           </button>
         </aside>
       )}
@@ -948,12 +937,23 @@ export function AssessmentClient() {
         </div>
       </section>
       {message && <p className="demo-error" role="alert">{message}</p>}
+      {showSubmitDialog && (
+        <div className="demo-submit-dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="submit-dialog-title">
+          <div className="demo-submit-dialog">
+            <h2 id="submit-dialog-title">Submit your assessment?</h2>
+            <p>Once submitted, you cannot change your answers. Unanswered questions receive zero marks.</p>
+            <div className="demo-submit-dialog-actions">
+              <button className="button" onClick={() => setShowSubmitDialog(false)} type="button">Return to assessment</button>
+              <button className="button button-primary" onClick={() => void submitAssessment()} type="button">Submit assessment</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="demo-submit-row">
-        <p>Unanswered questions score zero. Saved answers remain available if you refresh.</p>
         <button
           className="button button-primary"
           disabled={isSubmitting}
-          onClick={() => void submitAssessment()}
+          onClick={() => setShowSubmitDialog(true)}
           type="button"
         >
           {isSubmitting ? "Submitting…" : "Submit assessment"}

@@ -177,7 +177,7 @@ export function CandidateWelcomeForm() {
           return;
         }
 
-        router.replace("/start/instructions?registration=complete");
+        router.replace("/start/instructions");
         return;
       }
 
@@ -353,7 +353,7 @@ export function CandidateWelcomeForm() {
               rel="noopener noreferrer"
               target="_blank"
             >
-              Mustarred Privacy Policy →
+              Mustarred Privacy Notice →
             </a>
           </div>
         )}
@@ -395,14 +395,8 @@ export function CandidateWelcomeForm() {
             {isSignInMode
               ? "Your email must be verified before you can begin."
               : "Verify your email before beginning the assessment."}{" "}
-            <Link href="/start/instructions">Review the instructions</Link>.
           </p>
 
-          {!isSignInMode && (
-            <Link className="welcome-verified-link" href="/auth/callback">
-              Already verified? Continue →
-            </Link>
-          )}
           {isSignInMode && (
             <Link className="text-link" href="/auth/recover">
               Forgot your password?
@@ -423,7 +417,7 @@ export function CandidateWelcomeForm() {
           >
             {isSignInMode
               ? "New candidate? Register"
-              : "Already have an account? Sign in and finish setup"}
+              : "Already have an account? Sign in →"}
           </button>
         </div>
       </form>

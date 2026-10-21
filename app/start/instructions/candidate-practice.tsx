@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -147,13 +146,19 @@ export function CandidatePractice() {
 
       <div className="assessment-continue">
         <div className="assessment-continue-copy">
-          <span className="continue-step">UP NEXT</span>
-          <p>
-            You have one attempt. The timer starts when you begin; existing attempts keep their original deadline.
+          <p style={{ fontSize: "1.15rem", color: "#000", fontWeight: 700 }}>
+            <strong>One attempt</strong>
+            <br />
+            You can take the assessment only once.
+          </p>
+          <p style={{ fontSize: "1.15rem", color: "#000", fontWeight: 700 }}>
+            <strong>12-minute timer</strong>
+            <br />
+            Timer starts when you begin; returning resumes the same attempt and deadline.
           </p>
           {!attempt && (
             <p className="continue-status" role="status" aria-live="polite">
-              {startMessage || "Register and verify your email before beginning."}
+                    {startMessage || ""}
             </p>
           )}
           {attempt && (
@@ -164,9 +169,6 @@ export function CandidatePractice() {
               Deadline: {new Date(attempt.deadline_at).toLocaleString()}.
             </p>
           )}
-          <Link className="text-link" href="/start">
-            Sign in or create an account
-          </Link>
         </div>
         <button
           className="button button-primary continue-button"

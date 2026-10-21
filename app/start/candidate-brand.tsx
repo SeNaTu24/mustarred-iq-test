@@ -4,6 +4,7 @@ import Link from "next/link";
 type CandidateHeaderProps = {
   backHref?: string;
   backLabel?: string;
+  logoClickable?: boolean;
 };
 
 type CandidateFooterProps = {
@@ -25,12 +26,19 @@ export function CandidateBrandLogo({ size = "header" }: { size?: "header" | "foo
   );
 }
 
-export function CandidateHeader({ backHref, backLabel }: CandidateHeaderProps) {
+export function CandidateHeader({ backHref, backLabel, logoClickable = true }: CandidateHeaderProps) {
+  const logo = <CandidateBrandLogo />;
   return (
     <header className="candidate-header">
-      <Link className="candidate-brand-home" href="/" aria-label="Mustarred home">
-        <CandidateBrandLogo />
-      </Link>
+      {logoClickable ? (
+        <Link className="candidate-brand-home" href="/" aria-label="Mustarred home">
+          {logo}
+        </Link>
+      ) : (
+        <span className="candidate-brand-home" aria-label="Mustarred">
+          {logo}
+        </span>
+      )}
       {backHref && backLabel && (
         <Link className="candidate-return-link" href={backHref}>
           <span aria-hidden="true">←</span>

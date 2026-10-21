@@ -69,10 +69,10 @@ body:has(.demo-assessment.candidate-flow) {
   position: absolute;
   display: block;
   max-width: none;
-  width: 336px;
+  width: 268px;
   height: auto;
-  left: -74px;
-  top: -73px;
+  left: -63px;
+  top: -56px;
 }
 
 .candidate-logo-window-footer .candidate-logo-image {
@@ -281,6 +281,144 @@ body:has(.demo-assessment.candidate-flow) {
 
 .candidate-flow .privacy-check input {
   accent-color: var(--candidate-primary);
+}
+
+.candidate-flow .welcome-main-centered {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-block: clamp(40px, 6vw, 72px);
+}
+
+.candidate-flow .welcome-main-centered .welcome-form-card {
+  width: 100%;
+  max-width: 420px;
+  border: 1px solid var(--candidate-line);
+  border-radius: 12px;
+  background: var(--candidate-white);
+  box-shadow:
+    0 2px 8px rgb(30 17 56 / 5%),
+    0 8px 32px rgb(30 17 56 / 7%);
+  padding: 28px 28px 24px;
+}
+
+.candidate-flow .welcome-main-centered .welcome-form-heading {
+  padding-bottom: 18px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--candidate-soft-line);
+}
+
+.candidate-flow .welcome-main-centered .welcome-form-heading h2 {
+  margin: 6px 0 4px;
+  font-size: 18px;
+  letter-spacing: -0.03em;
+}
+
+.candidate-flow .welcome-main-centered .welcome-form-heading p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--candidate-muted);
+}
+
+.candidate-flow .welcome-main-centered .form-field {
+  margin-top: 14px;
+}
+
+.candidate-flow .welcome-main-centered .form-field label {
+  font-size: 11px;
+  margin-bottom: 5px;
+}
+
+.candidate-flow .welcome-main-centered .form-field input {
+  min-height: 38px;
+  font-size: 13px;
+  padding: 0 10px;
+}
+
+.candidate-flow .welcome-main-centered .welcome-privacy-block {
+  margin-top: 14px;
+  padding: 12px;
+  gap: 10px;
+}
+
+.candidate-flow .welcome-main-centered .welcome-form-footer {
+  margin-top: 16px;
+  gap: 10px;
+}
+
+.candidate-flow .welcome-main-centered .welcome-submit {
+  min-height: 40px;
+  padding-inline: 20px;
+  font-size: 11px;
+}
+
+.candidate-flow .welcome-main-centered .welcome-divider {
+  margin: 2px 0;
+}
+
+.candidate-flow .welcome-main-centered .welcome-instructions-link {
+  margin-top: 16px;
+  font-size: 11px;
+}
+
+.candidate-flow .callback-card {
+  width: 100%;
+  max-width: 420px;
+}
+
+.candidate-flow .callback-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+}
+
+.candidate-flow .callback-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.candidate-flow .callback-icon-success {
+  background: #eaf0f6;
+  color: var(--candidate-primary);
+}
+
+.candidate-flow .callback-icon-error {
+  background: #f6eaea;
+  color: #8c3029;
+}
+
+.candidate-flow .callback-heading {
+  margin: 6px 0 10px;
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  color: var(--candidate-deep);
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.candidate-flow .callback-body {
+  margin: 0 0 20px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--candidate-muted);
+}
+
+.candidate-flow .callback-action {
+  align-self: flex-start;
+}
+
+.candidate-flow .callback-name-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
 }
 
 .candidate-flow .welcome-submit {
@@ -555,14 +693,71 @@ body:has(.demo-assessment.candidate-flow) {
   opacity: 0.88;
 }
 
+/* ── /start two-column layout ── */
+
+.candidate-flow .start-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: start;
+  gap: clamp(40px, 6vw, 80px);
+}
+
+.candidate-flow .start-form-col {
+  position: sticky;
+  top: 24px;
+}
+
+.candidate-flow .start-info-col .instructions-hero {
+  max-width: none;
+  padding-bottom: clamp(32px, 5vw, 52px);
+}
+
+.candidate-flow .start-info-col .instructions-hero h2 {
+  margin: 23px 0 0;
+  font-size: clamp(32px, 4vw, 52px);
+  font-weight: 580;
+  letter-spacing: -0.04em;
+  line-height: 1.03;
+  color: var(--candidate-deep);
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.candidate-flow .start-info-col .instructions-hero h2 span {
+  color: var(--candidate-primary);
+  font-style: italic;
+}
+
+.candidate-flow .start-info-col .rounds-section {
+  padding-block: clamp(32px, 5vw, 54px);
+}
+
+.candidate-flow .start-info-col .practice-section {
+  border-color: var(--candidate-line);
+  border-radius: 5px;
+  background: #f0eff8;
+}
+
+@media (max-width: 900px) {
+  .candidate-flow .start-layout {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+
+  .candidate-flow .start-form-col {
+    position: static;
+  }
+}
+
 /* ── Landing page overrides ── */
 
 .candidate-flow .hero h1 {
   color: var(--candidate-deep);
   font-family: Arial, Helvetica, sans-serif;
+  font-size: clamp(28px, 3.2vw, 40px);
   font-weight: 580;
-  letter-spacing: -5px;
-  line-height: 0.99;
+  letter-spacing: -1.5px;
+  line-height: 1.15;
+  white-space: nowrap;
 }
 
 .candidate-flow .hero h1 span {
@@ -838,6 +1033,13 @@ body:has(.demo-assessment.candidate-flow) {
   line-height: 1.65;
 }
 
+.demo-assessment.candidate-flow .demo-security-notice-amber {
+  border-color: #e8dfc0;
+  border-left-color: #b07d20;
+  background: #fdf8ec;
+  color: #3d2e0a;
+}
+
 .demo-assessment.candidate-flow .demo-security-notice p {
   margin: 0;
 }
@@ -845,6 +1047,10 @@ body:has(.demo-assessment.candidate-flow) {
 .demo-assessment.candidate-flow .demo-security-notice p + p {
   margin-top: 7px;
   color: #8c3029;
+}
+
+.demo-assessment.candidate-flow .demo-security-notice-amber p + p {
+  color: #7a5a10;
 }
 
 .demo-assessment.candidate-flow .demo-security-notice button {
@@ -858,6 +1064,10 @@ body:has(.demo-assessment.candidate-flow) {
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+.demo-assessment.candidate-flow .demo-security-notice-amber button {
+  color: #7a5a10;
 }
 
 .demo-assessment.candidate-flow .demo-actions {
@@ -998,8 +1208,56 @@ body:has(.demo-assessment.candidate-flow) {
   font-size: 12px;
 }
 
-.demo-result-view > .button {
-  margin-top: 8px;
+.demo-submit-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(30 17 56 / 40%);
+  padding: 24px;
+}
+
+.demo-submit-dialog {
+  width: 100%;
+  max-width: 420px;
+  padding: clamp(20px, 4vw, 32px);
+  border-radius: 8px;
+  background: white;
+  box-shadow: 0 8px 40px rgb(30 17 56 / 18%);
+}
+
+.demo-submit-dialog h2 {
+  margin: 0 0 10px;
+  color: var(--candidate-deep);
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+
+.demo-submit-dialog p {
+  margin: 0 0 22px;
+  color: var(--candidate-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.demo-submit-dialog-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.demo-submit-dialog-actions .button:not(.button-primary) {
+  border: 1px solid #d8d6e6;
+  background: white;
+  color: var(--candidate-deep);
+}
+
+.demo-submit-dialog-actions .button:not(.button-primary):hover {
+  border-color: #aaa7d8;
+  background: #f4f3fb;
 }
 
 @media (max-width: 900px) {
@@ -1020,10 +1278,10 @@ body:has(.demo-assessment.candidate-flow) {
   }
 
   .candidate-flow .candidate-logo-window-header .candidate-logo-image {
-    width: 301px;
+    width: 250px;
     height: auto;
-    left: -66px;
-    top: -65px;
+    left: -55px;
+    top: -56px;
   }
 
   .candidate-flow .candidate-return-link {
@@ -1050,8 +1308,17 @@ body:has(.demo-assessment.candidate-flow) {
     letter-spacing: -0.04em;
   }
 
+  .candidate-flow .hero h1 {
+    white-space: normal;
+  }
+
   .candidate-flow .welcome-form-card {
     padding: 22px 18px;
+  }
+
+  .candidate-flow .welcome-main-centered .welcome-form-card {
+    border-radius: 10px;
+    padding: 22px 18px 18px;
   }
 
   .candidate-flow .welcome-submit {

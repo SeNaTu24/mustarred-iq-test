@@ -9,6 +9,7 @@ import {
   processEmailConfirmation,
   type EmailConfirmationOutcome,
 } from "@/lib/supabase/email-confirmation";
+import { CandidateHeader, CandidateFooter } from "@/app/start/candidate-brand";
 
 type CallbackOutcome = EmailConfirmationOutcome;
 let callbackProcessing: Promise<CallbackOutcome> | null = null;
@@ -67,25 +68,29 @@ async function processCandidateEmailCallback(): Promise<CallbackOutcome> {
   return outcome;
 }
 
+type PageState =
+  | { kind: "loading" }
+  | { kind: "verified" }
+  | { kind: "needs_name" }
+  | { kind: "error"; message: string };
+
 export default function AuthCallbackPage() {
   const router = useRouter();
-  const [message, setMessage] = useState("Verifying your email…");
-  const [hasError, setHasError] = useState(false);
-  const [needsName, setNeedsName] = useState(false);
+  const [state, setState] = useState<PageState>({ kind: "loading" });
   const [fullName, setFullName] = useState("");
   const [isSavingName, setIsSavingName] = useState(false);
+  const [nameError, setNameError] = useState("");
 
   async function submitMissingName(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const name = fullName.trim();
     if (name.length < 1 || name.length > 120) {
-      setMessage("Enter a name between 1 and 120 characters.");
-      setHasError(true);
+      setNameError("Enter a name between 1 and 120 characters.");
       return;
     }
 
     setIsSavingName(true);
-    setHasError(false);
+    setNameError("");
     try {
       const supabase = getSupabaseBrowserClient();
       const {
@@ -126,7 +131,7 @@ export default function AuthCallbackPage() {
           // An empty/malformed response may follow a successful insert; retry idempotently.
         }
         if (response.ok) {
-          router.replace("/start/instructions?registration=complete");
+          setState({ kind: "verified" });
           return;
         }
         if (response.status >= 500 && attempt === 0) continue;
@@ -153,9 +158,10 @@ export default function AuthCallbackPage() {
           error instanceof Error ? error.name : "UnknownError",
         );
       }
-      setHasError(true);
-      setMessage(
-        "We couldn’t finish setting up your profile. Please try again or return to sign in.",
+      setNameError(
+        error instanceof Error
+          ? error.message
+          : "We couldn't finish setting up your profile. Please try again.",
       );
     } finally {
       setIsSavingName(false);
@@ -168,57 +174,56 @@ export default function AuthCallbackPage() {
       callbackProcessing ??
       (callbackProcessing = processCandidateEmailCallback());
 
-    void operation.then((outcome) => {
-      if (cancelled) return;
-      if (outcome.kind === "success") {
-        router.replace(
-          outcome.recovery
-            ? "/auth/update-password"
-            : "/start/instructions?registration=complete",
-        );
-        return;
-      }
+    void operation
+      .then((outcome) => {
+        if (cancelled) return;
 
-      if (outcome.kind === "needs_name") {
-        setNeedsName(true);
-        setMessage("Your email is verified. Enter your name to finish setting up your account.");
-        if (process.env.NODE_ENV === "development") {
-          console.warn("Verified account is missing a valid full_name value.");
+        if (outcome.kind === "success") {
+          if (outcome.recovery) {
+            router.replace("/auth/update-password");
+            return;
+          }
+          setState({ kind: "verified" });
+          return;
         }
-        return;
-      }
 
-      setHasError(true);
-      if (process.env.NODE_ENV === "development") {
-        console.warn("Candidate verification callback did not complete:", {
-          outcome: outcome.kind,
-          ...(outcome.code ? { code: outcome.code } : {}),
-          ...("status" in outcome && outcome.status
-            ? { status: outcome.status }
-            : {}),
-        });
-      }
+        if (outcome.kind === "needs_name") {
+          setState({ kind: "needs_name" });
+          if (process.env.NODE_ENV === "development") {
+            console.warn("Verified account is missing a valid full_name value.");
+          }
+          return;
+        }
 
-      if (outcome.kind === "invalid_link") {
-  setMessage(
-    "Your email may already be verified. Please try signing in. If you cannot sign in, request a new confirmation link.",
-  );
-} else if (outcome.kind === "session_unavailable") {
-        setMessage(
-          "The confirmation link could not be used in this browser. Return to candidate sign-in and finish setup there, or request a new link in the browser where you registered.",
-        );
-      } else if (outcome.kind === "not_verified") {
-        setMessage(
-          "Your email is not confirmed yet. Request a new confirmation link before signing in.",
-        );
-      } else {
-        setMessage(
-          "Your email is verified, but we couldn’t confirm that account setup finished. Sign in to retry setup; your account history is unchanged.",
-        );
-      }
-    }).finally(() => {
-      if (callbackProcessing === operation) callbackProcessing = null;
-    });
+        if (process.env.NODE_ENV === "development") {
+          console.warn("Candidate verification callback did not complete:", {
+            outcome: outcome.kind,
+            ...(outcome.code ? { code: outcome.code } : {}),
+            ...("status" in outcome && outcome.status
+              ? { status: outcome.status }
+              : {}),
+          });
+        }
+
+        let message: string;
+        if (outcome.kind === "invalid_link") {
+          message =
+            "This confirmation link is invalid or has already been used. If your email is already verified, you can sign in below. Otherwise, register again to receive a new link.";
+        } else if (outcome.kind === "session_unavailable") {
+          message =
+            "The confirmation link could not be used in this browser. Try opening the link in the browser where you registered, or register again to receive a new link.";
+        } else if (outcome.kind === "not_verified") {
+          message =
+            "Your email could not be confirmed. The link may have expired. Please register again to receive a new confirmation link.";
+        } else {
+          message =
+            "Your email is verified, but we couldn't finish setting up your account. Please sign in to retry.";
+        }
+        setState({ kind: "error", message });
+      })
+      .finally(() => {
+        if (callbackProcessing === operation) callbackProcessing = null;
+      });
 
     return () => {
       cancelled = true;
@@ -226,45 +231,89 @@ export default function AuthCallbackPage() {
   }, [router]);
 
   return (
-    <main className="welcome-main" id="main-content">
-      <section className="welcome-panel" aria-labelledby="callback-title">
-        <div className="welcome-intro">
-          <p className="eyebrow">Candidate registration</p>
-          <h1 id="callback-title">One moment.</h1>
-          <p
-            className="welcome-description"
-            role={hasError ? "alert" : "status"}
-            aria-live={hasError ? "assertive" : "polite"}
-          >
-            {message}
-          </p>
-          {needsName && (
-            <form className="welcome-form" onSubmit={submitMissingName}>
-              <label htmlFor="verified-candidate-name">Full name</label>
-              <input
-                autoComplete="name"
-                id="verified-candidate-name"
-                maxLength={120}
-                onChange={(event) => setFullName(event.target.value)}
-                required
-                value={fullName}
-              />
-              <button
-                className="button button-primary"
-                disabled={isSavingName}
-                type="submit"
-              >
-                {isSavingName ? "Saving…" : "Finish registration"}
-              </button>
-            </form>
+    <div className="candidate-flow">
+      <a className="skip-link" href="#main-content">
+        Skip to content
+      </a>
+      <CandidateHeader />
+      <main className="welcome-main welcome-main-centered" id="main-content">
+        <div className="welcome-form-card callback-card">
+          {state.kind === "loading" && (
+            <div className="callback-state">
+              <p className="eyebrow section-eyebrow">Email verification</p>
+              <h1 className="callback-heading">Verifying your email…</h1>
+              <p className="callback-body">Please wait a moment.</p>
+            </div>
           )}
-          {message !== "Verifying your email…" && (
-            <Link className="button button-primary" href="/start">
-              Return to registration
+
+          {state.kind === "verified" && (
+            <div className="callback-state">
+              <span className="callback-icon callback-icon-success" aria-hidden="true">✓</span>
+            <p className="eyebrow section-eyebrow">Email verified</p>
+            <h1 className="callback-heading">Your email is confirmed</h1>
+            <p className="callback-body">
+              Your account is ready. Continue to the assessment instructions.
+            </p>
+            <Link className="button button-primary callback-action" href="/start/instructions">
+              Continue to assessment →
             </Link>
+            </div>
+          )}
+
+          {state.kind === "needs_name" && (
+            <div className="callback-state">
+              <span className="callback-icon callback-icon-success" aria-hidden="true">✓</span>
+              <p className="eyebrow section-eyebrow">Email verified</p>
+              <h1 className="callback-heading">One last step.</h1>
+              <p className="callback-body">
+                Your email is verified. Enter your name to finish setting up your account.
+              </p>
+              <form className="callback-name-form" onSubmit={submitMissingName}>
+                <div className="form-field">
+                  <label htmlFor="verified-candidate-name">Full name</label>
+                  <input
+                    autoComplete="name"
+                    id="verified-candidate-name"
+                    maxLength={120}
+                    onChange={(event) => setFullName(event.target.value)}
+                    required
+                    value={fullName}
+                  />
+                  {nameError && (
+                    <span className="form-error" role="alert">{nameError}</span>
+                  )}
+                </div>
+                <button
+                  className="button button-primary welcome-submit"
+                  disabled={isSavingName}
+                  type="submit"
+                >
+                  {isSavingName ? "Saving…" : "Finish setup →"}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {state.kind === "error" && (
+            <div className="callback-state">
+              <span className="callback-icon callback-icon-error" aria-hidden="true">✕</span>
+              <p className="eyebrow section-eyebrow">Verification failed</p>
+              <h1 className="callback-heading">Something went wrong.</h1>
+              <p
+                className="callback-body"
+                role="alert"
+                aria-live="assertive"
+              >
+                {state.message}
+              </p>
+              <Link className="button button-primary callback-action" href="/start">
+                Go to sign in →
+              </Link>
+            </div>
           )}
         </div>
-      </section>
-    </main>
+      </main>
+      <CandidateFooter label="CANDIDATE REGISTRATION" />
+    </div>
   );
 }

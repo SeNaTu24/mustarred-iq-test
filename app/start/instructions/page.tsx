@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { CandidatePractice } from "./candidate-practice";
 import { RegistrationNotice } from "./registration-notice";
 import { CandidateFooter, CandidateHeader } from "../candidate-brand";
@@ -54,7 +53,7 @@ export default function CandidateInstructionsPage() {
                 Skip to content
             </a>
 
-            <CandidateHeader backHref="/start" backLabel="Back to welcome" />
+            <CandidateHeader logoClickable={false} />
 
             <main className="instructions-main" id="main-content">
                 <RegistrationNotice />
@@ -64,65 +63,48 @@ export default function CandidateInstructionsPage() {
                 >
                     <p className="eyebrow">
                         <span className="eyebrow-dot" aria-hidden="true" />
-                        Before you begin
+                        A few things to note
                     </p>
                     <h1 id="instructions-title">
-                        Take a moment.
+                        One attempt.
                         <br />
-                        <span>Then make it yours.</span>
+                        <span>Make it count.</span>
                     </h1>
-                    <p className="instructions-lede">
-                        The assessment explores different ways of thinking about
-                        work. Read each question carefully and choose the
-                        response that best reflects your approach.
+                    <p className="instructions-lede" style={{ color: "#000" }}>
+                        This assessment explores how you approach decisions, solve
+                        problems and work with others. Read each question carefully
+                        and select the response that best reflects your judgement
+                        and approach.
                     </p>
                     <div
                         className="assessment-facts"
                         aria-label="Assessment format"
                     >
                         <div className="assessment-fact">
-                            <span
-                                className="assessment-fact-icon"
-                                aria-hidden="true"
-                            >
-                                ◷
-                            </span>
-                            <span>
+                                                        <span>
                                 <strong>12 minutes</strong>
                                 <small>Starts when you begin</small>
                             </span>
                         </div>
                         <div className="assessment-fact">
-                            <span
-                                className="assessment-fact-icon fact-icon-lime"
-                                aria-hidden="true"
-                            >
-                                30
-                            </span>
                             <span>
                                 <strong>30 questions</strong>
-                                <small>6 questions in each category</small>
+                                <small>5 competencies, 6 each</small>
                             </span>
                         </div>
                         <div className="assessment-fact">
-                            <span
-                                className="assessment-fact-icon fact-icon-peach"
-                                aria-hidden="true"
-                            >
-                                5
+                                                        <span>
+                                <strong>24 / 30</strong>
+                                <small>Provisional pass (80%)</small>
                             </span>
-                            <span>
-                                <strong>5 competencies</strong>
-                                <small>Balanced questions in each</small>
+                        </div>
+                        <div className="assessment-fact">
+                                                        <span>
+                                <strong>One attempt</strong>
+                                <small>Original deadline preserved</small>
                             </span>
                         </div>
                     </div>
-                    <p className="assessment-status-note">
-                        Each correct answer is worth 4 marks. You have one
-                        attempt, with a provisional pass threshold of 24 out of
-                        30 (80%). Existing attempts keep their original question
-                        set and deadline.
-                    </p>
                 </section>
 
                 <section
@@ -131,18 +113,11 @@ export default function CandidateInstructionsPage() {
                 >
                     <div className="instructions-section-heading">
                         <div>
-                            <p className="eyebrow section-eyebrow">
-                                Five rounds
-                            </p>
                             <h2 id="rounds-title">
                                 A wider view of how you think.
                             </h2>
                         </div>
-                        <p>
-                            Each competency has six questions. Expect a balanced
-                            mix of abstract reasoning and practical scenarios.
-                        </p>
-                    </div>
+                        </div>
 
                     <ol className="rounds-grid">
                         {rounds.map((round) => (
@@ -154,9 +129,6 @@ export default function CandidateInstructionsPage() {
                                     <h3>{round.title}</h3>
                                     <p>{round.description}</p>
                                 </div>
-                                <span className="round-question-count">
-                                    6 questions
-                                </span>
                             </li>
                         ))}
                     </ol>
@@ -173,7 +145,7 @@ export default function CandidateInstructionsPage() {
                                 className="practice-indicator"
                                 aria-hidden="true"
                             />
-                            Optional · unscored
+                            Practice · Not scored
                         </p>
                         <h2 id="practice-title">Try a practice question.</h2>
                         <p>
@@ -184,29 +156,9 @@ export default function CandidateInstructionsPage() {
                     <CandidatePractice />
                 </section>
 
-                <aside
-                    className="instructions-reminder"
-                    aria-label="Before you begin"
-                >
-                    <span className="reminder-symbol" aria-hidden="true">
-                        ✳
-                    </span>
-                    <p>
-                        The instructions and practice are untimed. One attempt
-                        only. Your timer starts when you begin the assessment.
-                        If you leave and return, your original deadline remains
-                        unchanged. There are 30 questions, with six from each
-                        competency. The provisional pass threshold is 24/30
-                        (80%). Save answers as you go, or submit to save any
-                        unsaved answers. Unanswered questions score zero.
-                    </p>
-                    <Link className="reminder-link" href="#instructions-title">
-                        Back to the top <span aria-hidden="true">↑</span>
-                    </Link>
-                </aside>
             </main>
 
-            <CandidateFooter label="CANDIDATE INSTRUCTIONS" />
+            <CandidateFooter label="" />
         </div>
     );
 }
