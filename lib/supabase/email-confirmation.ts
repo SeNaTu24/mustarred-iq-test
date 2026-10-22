@@ -211,9 +211,14 @@ export async function processEmailConfirmation({
 
   // An expired or reused link is not a new confirmation.
   // Only report an already-verified account when a confirmed session exists.
-  if (exchangeWasRejected && !expectedEmail) {
+  // An expired or reused link is not a new confirmation.
+// Only report an already-verified account when a confirmed session exists.
+if (exchangeWasRejected && !expectedEmail) {
+  if (user?.email_confirmed_at && session) {
     return { kind: "already_verified" };
   }
+  return { kind: "invalid_link", code: safeCode(exchangeError) ?? errorCode };
+}
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     let profile: ProfileSetupResult;
