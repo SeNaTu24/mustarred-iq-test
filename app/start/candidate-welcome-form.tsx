@@ -275,7 +275,7 @@ export function CandidateWelcomeForm() {
           <p>
             {isSignInMode
               ? "Sign in with your verified account. We'll check your candidate profile and finish setting it up if needed."
-              : "Register with an email address you can verify."}
+              : "Register with the email associated with your application."}
           </p>
         </div>
 
