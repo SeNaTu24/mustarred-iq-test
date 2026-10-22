@@ -228,7 +228,7 @@ export default function AuthCallbackPage() {
                 let message: string;
                 if (outcome.kind === "invalid_link") {
                     message =
-                        "This confirmation link is invalid or has already been used. If your email is already verified, you can sign in below. Otherwise, register again to receive a new link.";
+                        "Your registration may already be complete. You can try signing in below to continue to your assessment. If you're unable to sign in, please register again to receive a new confirmation link.";
                 } else if (outcome.kind === "session_unavailable") {
                     message =
                         "The confirmation link could not be used in this browser. Try opening the link in the browser where you registered, or register again to receive a new link.";
@@ -382,7 +382,7 @@ export default function AuthCallbackPage() {
 
                     {state.kind === "error" && (
                         <div className="callback-state">
-                            <span
+                            {/* <span
                                 className="callback-icon callback-icon-error"
                                 aria-hidden="true"
                             >
@@ -393,7 +393,7 @@ export default function AuthCallbackPage() {
                             </p>
                             <h1 className="callback-heading">
                                 Something went wrong.
-                            </h1>
+                            </h1> */}
                             <p
                                 className="callback-body"
                                 role="alert"
