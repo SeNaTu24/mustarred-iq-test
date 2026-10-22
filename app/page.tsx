@@ -21,7 +21,7 @@ export default function Home() {
               <span className="eyebrow-dot" aria-hidden="true" />
               RCAP Candidate Assessment
             </p>
-            <h1>The Journey to RCAP begins here.</h1>
+            <h1>Your Journey to RCAP begins here.</h1>
             <p className="hero-description">
               Take these 30-question professional assessment and answer as many questions correctly as possible
             </p>

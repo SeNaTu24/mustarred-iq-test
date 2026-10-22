@@ -1,3 +1,4 @@
+
 type AuthSession = { access_token: string };
 type AuthUser = { email?: string; email_confirmed_at?: string | null };
 type AuthResult<T> = { data: T; error: unknown | null };
@@ -15,9 +16,7 @@ type ConfirmationAuth = {
     access_token: string;
     refresh_token: string;
   }) => Promise<AuthResult<unknown>>;
-  getSession: () => Promise<
-    AuthResult<{ session: AuthSession | null }>
-  >;
+  getSession: () => Promise<AuthResult<{ session: AuthSession | null }>>;
   getUser: () => Promise<AuthResult<{ user: AuthUser | null }>>;
 };
 
@@ -30,6 +29,7 @@ type ProfileSetupResult = {
 export type EmailConfirmationOutcome =
   | { kind: "success"; recovery: boolean; alreadyVerified: boolean }
   | { kind: "needs_name" }
+  | { kind: "already_verified" }
   | { kind: "invalid_link"; code?: string }
   | { kind: "session_unavailable"; code?: string }
   | { kind: "not_verified"; code?: string }
@@ -39,6 +39,7 @@ function safeCode(error: unknown): string | undefined {
   if (typeof error !== "object" || error === null || !("code" in error)) {
     return undefined;
   }
+
   const code = error.code;
   return typeof code === "string" && /^[A-Za-z0-9_.-]{1,80}$/.test(code)
     ? code
@@ -53,8 +54,15 @@ function getCallbackParam(
   return url.searchParams.get(key) ?? hash.get(key);
 }
 
-function sameEmail(left: string | null | undefined, right: string | null | undefined) {
-  return Boolean(left && right && left.trim().toLowerCase() === right.trim().toLowerCase());
+function sameEmail(
+  left: string | null | undefined,
+  right: string | null | undefined,
+): boolean {
+  return Boolean(
+    left &&
+      right &&
+      left.trim().toLowerCase() === right.trim().toLowerCase(),
+  );
 }
 
 export async function processEmailConfirmation({
@@ -71,6 +79,7 @@ export async function processEmailConfirmation({
   ) => Promise<ProfileSetupResult>;
 }): Promise<EmailConfirmationOutcome> {
   let url: URL;
+
   try {
     url = new URL(callbackUrl);
   } catch {
@@ -83,7 +92,9 @@ export async function processEmailConfirmation({
   const callbackError = getParam("error");
   const verificationType = getParam("type");
   const recovery =
-    verificationType === "recovery" || url.searchParams.get("flow") === "recovery";
+    verificationType === "recovery" ||
+    url.searchParams.get("flow") === "recovery";
+
   const code = getParam("code");
   const tokenHash = getParam("token_hash");
   const accessToken = getParam("access_token");
@@ -99,14 +110,17 @@ export async function processEmailConfirmation({
   ) {
     return { kind: "invalid_link", code: errorCode };
   }
+
   if (hasSessionTokens && (!accessToken || !refreshToken)) {
     return { kind: "invalid_link", code: errorCode };
   }
+
   if (recovery && (callbackError || !hasCallbackMaterial)) {
     return { kind: "invalid_link", code: errorCode };
   }
 
   let exchangeError: unknown;
+
   if (!callbackError) {
     try {
       if (code) {
@@ -119,8 +133,12 @@ export async function processEmailConfirmation({
         ) {
           return { kind: "invalid_link", code: errorCode };
         }
+
         exchangeError = (
-          await auth.verifyOtp({ token_hash: tokenHash, type: verificationType })
+          await auth.verifyOtp({
+            token_hash: tokenHash,
+            type: verificationType,
+          })
         ).error;
       } else if (accessToken && refreshToken) {
         exchangeError = (
@@ -137,6 +155,7 @@ export async function processEmailConfirmation({
 
   let session: AuthSession | null = null;
   let sessionError: unknown;
+
   try {
     const result = await auth.getSession();
     session = result.data.session;
@@ -144,9 +163,11 @@ export async function processEmailConfirmation({
   } catch (error) {
     sessionError = error;
   }
+
   if (!session) {
     const codeValue =
       safeCode(sessionError) ?? safeCode(exchangeError) ?? errorCode;
+
     return hasCallbackMaterial || callbackError
       ? { kind: "invalid_link", code: codeValue }
       : { kind: "session_unavailable", code: codeValue };
@@ -154,6 +175,7 @@ export async function processEmailConfirmation({
 
   let user: AuthUser | null = null;
   let userError: unknown;
+
   try {
     const result = await auth.getUser();
     user = result.data.user;
@@ -161,6 +183,7 @@ export async function processEmailConfirmation({
   } catch (error) {
     userError = error;
   }
+
   if (userError || !user?.email_confirmed_at) {
     return {
       kind: "not_verified",
@@ -169,9 +192,11 @@ export async function processEmailConfirmation({
   }
 
   const exchangeWasRejected = Boolean(callbackError || exchangeError);
+
+  // Preserve email-mismatch protection whenever an expected email is supplied.
   if (
-    (expectedEmail && !sameEmail(expectedEmail, user.email)) ||
-    (exchangeWasRejected && !sameEmail(expectedEmail, user.email)) ||
+    (expectedEmail != null &&
+      !sameEmail(expectedEmail, user.email)) ||
     (recovery && exchangeWasRejected)
   ) {
     return {
@@ -183,12 +208,16 @@ export async function processEmailConfirmation({
   if (recovery) {
     return { kind: "success", recovery: true, alreadyVerified: false };
   }
+
+  // An expired or reused link is not a new confirmation.
+  // Only report an already-verified account when a confirmed session exists.
   if (exchangeWasRejected && !expectedEmail) {
-    return { kind: "invalid_link", code: safeCode(exchangeError) ?? errorCode };
+    return { kind: "already_verified" };
   }
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     let profile: ProfileSetupResult;
+
     try {
       profile = await ensureCandidateProfile(session.access_token);
     } catch (error) {
@@ -203,10 +232,16 @@ export async function processEmailConfirmation({
         alreadyVerified: exchangeWasRejected || !hasCallbackMaterial,
       };
     }
-    if (profile.status === 422 && profile.code === "candidate_name_required") {
+
+    if (
+      profile.status === 422 &&
+      profile.code === "candidate_name_required"
+    ) {
       return { kind: "needs_name" };
     }
+
     if (profile.status >= 500 && attempt === 0) continue;
+
     return {
       kind: "profile_setup_failed",
       code: profile.code,

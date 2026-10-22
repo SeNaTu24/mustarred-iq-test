@@ -146,15 +146,15 @@ export function CandidatePractice() {
 
       <div className="assessment-continue">
         <div className="assessment-continue-copy">
-          <p style={{ fontSize: "1.15rem", color: "#000", fontWeight: 700 }}>
-            <strong>One attempt</strong>
+          <p style={{ fontSize: "1.15rem", color: "#000", fontWeight: 500 }}>
+            <strong>One attempt only</strong>
             <br />
-            You can take the assessment only once.
+            You cannot retake the assessment once you have started.
           </p>
-          <p style={{ fontSize: "1.15rem", color: "#000", fontWeight: 700 }}>
-            <strong>12-minute timer</strong>
+          <p style={{ fontSize: "1.15rem", color: "#000", fontWeight: 500 }}>
+            <strong>12-minute time limit</strong>
             <br />
-            Timer starts when you begin; returning resumes the same attempt and deadline.
+            Your time starts as soon as you begin. Make sure you're ready before starting.
           </p>
           {!attempt && (
             <p className="continue-status" role="status" aria-live="polite">

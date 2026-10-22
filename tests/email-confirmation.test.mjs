@@ -287,3 +287,73 @@ test("registration stores the expected email and successful callback gives expli
   assert.match(notice, /Your email is confirmed and your candidate account is ready/);
   assert.match(profileRoute, /if \(!authData\.user\.email_confirmed_at\)/);
 });
+
+test("expired link with confirmed session and missing expectedEmail returns already_verified", async () => {
+  const { auth } = createAuth();
+  let profileCalls = 0;
+  const outcome = await processEmailConfirmation({
+    callbackUrl: "https://app.example.test/auth/callback?error=access_denied&error_code=otp_expired",
+    expectedEmail: null,
+    auth,
+    ensureCandidateProfile: async () => {
+      profileCalls += 1;
+      return { ok: true, status: 200 };
+    },
+  });
+
+  assert.deepEqual(outcome, { kind: "already_verified" });
+  assert.equal(profileCalls, 0);
+});
+
+test("expired link with confirmed session and mismatched expectedEmail returns invalid_link", async () => {
+  const { auth } = createAuth();
+  let profileCalls = 0;
+  const outcome = await processEmailConfirmation({
+    callbackUrl: "https://app.example.test/auth/callback?error=access_denied&error_code=otp_expired",
+    expectedEmail: "wrong@example.test", // Mismatched email
+    auth,
+    ensureCandidateProfile: async () => {
+      profileCalls += 1;
+      return { ok: true, status: 200 };
+    },
+  });
+
+  assert.deepEqual(outcome, { kind: "invalid_link", code: "otp_expired" });
+  assert.equal(profileCalls, 0);
+});
+
+test("expired link with no session returns invalid_link", async () => {
+  const { auth } = createAuth({ session: null });
+  let profileCalls = 0;
+  const outcome = await processEmailConfirmation({
+    callbackUrl: "https://app.example.test/auth/callback?error=access_denied&error_code=otp_expired",
+    expectedEmail: null,
+    auth,
+    ensureCandidateProfile: async () => {
+      profileCalls += 1;
+      return { ok: true, status: 200 };
+    },
+  });
+
+  assert.deepEqual(outcome, { kind: "invalid_link", code: "otp_expired" });
+  assert.equal(profileCalls, 0);
+});
+
+test("expired link with unconfirmed user returns not_verified", async () => {
+  const { auth } = createAuth({
+    user: { email: verifiedEmail, email_confirmed_at: null },
+  });
+  let profileCalls = 0;
+  const outcome = await processEmailConfirmation({
+    callbackUrl: "https://app.example.test/auth/callback?error=access_denied&error_code=otp_expired",
+    expectedEmail: null,
+    auth,
+    ensureCandidateProfile: async () => {
+      profileCalls += 1;
+      return { ok: true, status: 200 };
+    },
+  });
+
+  assert.equal(outcome.kind, "not_verified");
+  assert.equal(profileCalls, 0);
+});

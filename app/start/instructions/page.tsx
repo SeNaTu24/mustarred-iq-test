@@ -114,7 +114,7 @@ export default function CandidateInstructionsPage() {
                     <div className="instructions-section-heading">
                         <div>
                             <h2 id="rounds-title">
-                                A wider view of how you think.
+                                The five competencies we assess.
                             </h2>
                         </div>
                         </div>
