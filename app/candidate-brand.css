@@ -926,7 +926,11 @@ body:has(.demo-assessment.candidate-flow) {
 
 .demo-assessment.candidate-flow .demo-question-card h2 {
   color: var(--candidate-deep);
-  letter-spacing: -0.025em;
+  font-size: 19px;
+  line-height: 1.65;
+  letter-spacing: -0.01em;
+  font-weight: 500;
+  margin-block: 16px 20px;
 }
 
 .demo-assessment.candidate-flow .demo-option {
@@ -1041,7 +1045,7 @@ body:has(.demo-assessment.candidate-flow) {
 .demo-assessment.candidate-flow .demo-security-notice-amber {
   border-color: #f0d48a;
   border-left-color: #b7791f;
-  background: #ff7e6f;
+  background: #e5d397;
   color: #493510;
 }
 
