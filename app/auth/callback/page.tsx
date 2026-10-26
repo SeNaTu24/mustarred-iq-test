@@ -234,7 +234,7 @@ export default function AuthCallbackPage() {
                         "The confirmation link could not be used in this browser. Try opening the link in the browser where you registered, or register again to receive a new link.";
                 } else if (outcome.kind === "not_verified") {
                     message =
-                        "Your email could not be confirmed. The link may have expired. Please register again to receive a new confirmation link.";
+                        "Your registration may already be complete. You can try signing in below to continue to your assessment. If you're unable to sign in, please register again to receive a new confirmation link.";
                 } else {
                     message =
                         "Your email is verified, but we couldn't finish setting up your account. Please sign in to retry.";
