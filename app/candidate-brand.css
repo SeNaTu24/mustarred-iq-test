@@ -853,6 +853,21 @@ body:has(.demo-assessment.candidate-flow) {
   background: transparent;
 }
 
+.demo-assessment.candidate-flow.is-restricted {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.demo-assessment.candidate-flow.is-restricted .demo-question-card h2,
+.demo-assessment.candidate-flow.is-restricted .demo-option,
+.demo-assessment.candidate-flow.is-restricted .demo-option span,
+.demo-assessment.candidate-flow.is-restricted .demo-question-meta,
+.demo-assessment.candidate-flow.is-restricted .demo-reflection-note,
+.demo-assessment.candidate-flow.is-restricted .demo-options legend {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 .demo-assessment.candidate-flow .candidate-header {
   width: 100%;
   margin-bottom: 30px;

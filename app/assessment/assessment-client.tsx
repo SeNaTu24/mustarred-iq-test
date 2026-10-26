@@ -344,6 +344,27 @@ export function AssessmentClient() {
     ? session.questions.filter((question) => answers[question.id] !== undefined).length
     : 0;
 
+  const isAttemptActive = attemptStatus === "in_progress" && !!session && !result;
+
+  useEffect(() => {
+    if (!isAttemptActive) return;
+    function preventDefault(event: Event) {
+      event.preventDefault();
+    }
+    document.addEventListener("copy", preventDefault);
+    document.addEventListener("cut", preventDefault);
+    document.addEventListener("paste", preventDefault);
+    document.addEventListener("contextmenu", preventDefault);
+    document.addEventListener("selectstart", preventDefault);
+    return () => {
+      document.removeEventListener("copy", preventDefault);
+      document.removeEventListener("cut", preventDefault);
+      document.removeEventListener("paste", preventDefault);
+      document.removeEventListener("contextmenu", preventDefault);
+      document.removeEventListener("selectstart", preventDefault);
+    };
+  }, [isAttemptActive]);
+
   useEffect(() => {
     if (
       secondsRemaining === 0 &&
@@ -757,7 +778,7 @@ export function AssessmentClient() {
   }
 
   return (
-    <main className="demo-assessment candidate-flow">
+    <main className={`demo-assessment candidate-flow${isAttemptActive ? " is-restricted" : ""}`}>
       <header className="candidate-header"><CandidateBrandLogo /></header>
       <header className="demo-assessment-header">
         <div>
