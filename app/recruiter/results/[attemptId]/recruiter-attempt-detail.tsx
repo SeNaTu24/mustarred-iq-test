@@ -120,7 +120,6 @@ export function RecruiterAttemptDetail({ attemptId }: { attemptId: string }) {
   return (
     <main className="recruiter-page">
       <div className="demo-data-banner">
-        TEMPORARY DEMO DATA — not CEO-approved or validated for hiring
       </div>
       <p><Link href="/recruiter/sign-in">Recruiter sign in</Link></p>
       <p><Link href="/recruiter">← Candidate results</Link></p>
