@@ -1,4 +1,5 @@
-﻿import Link from "next/link";
+﻿
+import Link from "next/link";
 import { CandidateBrandLogo } from "./start/candidate-brand";
 
 export default function Home() {
@@ -9,7 +10,11 @@ export default function Home() {
       </a>
 
       <header className="candidate-header">
-        <Link className="candidate-brand-home" href="/" aria-label="Mustarred home">
+        <Link
+          className="candidate-brand-home"
+          href="/"
+          aria-label="Mustarred home"
+        >
           <CandidateBrandLogo />
         </Link>
       </header>
@@ -21,13 +26,14 @@ export default function Home() {
               <span className="eyebrow-dot" aria-hidden="true" />
               RCAP Candidate Assessment
             </p>
-            <h1>Your Journey to RCAP begins here.</h1>
+
+            <h1>Assessment Closed</h1>
+
             <p className="hero-description">
-              Take these 30-question professional assessment and answer as many questions correctly as possible
+              The RCAP assessment period has ended. Registration and
+              assessment access are now closed. Thank you for your
+              interest in Mustarred.
             </p>
-            <div className="hero-actions">
-            <a className="button button-primary" href="/start">Get Started</a>
-            </div>
           </div>
 
           <div className="hero-art" aria-hidden="true">
@@ -37,7 +43,7 @@ export default function Home() {
               <div className="art-center">
                 <div className="art-ring">
                   <div className="art-ring-inner">
-                    <span className="art-ring-star">âœ³</span>
+                    <span className="art-ring-star">✳</span>
                   </div>
                 </div>
               </div>
@@ -48,10 +54,16 @@ export default function Home() {
 
       <footer className="candidate-footer">
         <div className="candidate-footer-inner">
-          <Link className="candidate-brand-home" href="/" aria-label="Mustarred home">
+          <Link
+            className="candidate-brand-home"
+            href="/"
+            aria-label="Mustarred home"
+          >
             <CandidateBrandLogo size="footer" />
           </Link>
+
           <p>Thoughtful assessments. Human potential.</p>
+
           <a
             className="landing-footer-policy"
             href="https://www.mustarred.com/privacy-policy"
