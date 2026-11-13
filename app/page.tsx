@@ -1,4 +1,4 @@
-﻿
+
 import Link from "next/link";
 import { CandidateBrandLogo } from "./start/candidate-brand";
 
@@ -27,13 +27,14 @@ export default function Home() {
               RCAP Candidate Assessment
             </p>
 
-            <h1>Assessment Closed</h1>
+            <h1>Your Journey to RCAP begins here.</h1>
 
             <p className="hero-description">
-              The RCAP assessment period has ended. Registration and
-              assessment access are now closed. Thank you for your
-              interest in Mustarred.
+              Take these 30-question professional assessment and answer as many questions correctly as possible
             </p>
+            <div className="hero-actions">
+              <a className="button button-primary" href="/start">Get Started</a>
+            </div>
           </div>
 
           <div className="hero-art" aria-hidden="true">
