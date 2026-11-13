@@ -24,13 +24,16 @@ export default function Home() {
           <div className="hero-copy">
             <p className="eyebrow">
               <span className="eyebrow-dot" aria-hidden="true" />
-              RCAP Candidate Assessment
+              Mustarred Marketing Assessment
             </p>
 
-            <h1>Your Journey to RCAP begins here.</h1>
+            <h1>Your next opportunity starts here.</h1>
 
             <p className="hero-description">
-              Take these 30-question professional assessment and answer as many questions correctly as possible
+              Complete this 30-question assessment as the next stage of your application for the Marketing role at Mustarred.
+            </p>
+            <p className="hero-description">
+              The pass mark is 80%. Only candidates who meet or exceed this score will progress to the next stage.
             </p>
             <div className="hero-actions">
               <a className="button button-primary" href="/start">Get Started</a>
